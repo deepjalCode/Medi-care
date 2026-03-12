@@ -1,160 +1,105 @@
-import React, { useState } from 'react';
-import {
-  View,
-  StyleSheet,
-  StatusBar,
-} from 'react-native';
-import Login from './components/Login';
-import AdminPanel from './components/AdminPanel';
-import PatientRegistration from './components/PatientRegistration';
-import PatientDashboard from './components/PatientDashboard';
-import DoctorDashboard from './components/DoctorDashboard';
+import React, { useEffect, useState } from 'react';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { Provider as ReduxProvider } from 'react-redux';
+import { PaperProvider, MD3LightTheme as DefaultTheme } from 'react-native-paper';
+import { store, initDB } from './src/store';
+import RootNavigator from './src/navigation/RootNavigator';
+import { supabase } from './src/services/supabaseSetup';
+import { getUserProfile, UserData } from './src/services/userService';
+import { login, logout, setAuthLoading } from './src/store/slices/authSlice';
 
-// Types
-type UserType = 'admin' | 'patient' | 'doctor';
-type Screen = 'login' | 'adminPanel' | 'patientRegistration' | 'patientDashboard' | 'doctorDashboard';
 
-interface Patient {
-  name: string;
-  email: string;
-  password?: string;
-  phone: string;
-  age: string;
-  gender: string;
-  registeredAt?: Date;
-}
+const theme = {
+  ...DefaultTheme,
+  colors: {
+    ...DefaultTheme.colors,
+    primary: '#a2d2ff', // Light Blue
+    onPrimary: '#002a4d', // Dark text on light blue
+    primaryContainer: '#bde0fe', // Lighter Blue
+    onPrimaryContainer: '#002a4d',
+    secondary: '#cdb4db', // Pastel Purple
+    onSecondary: '#2b1040', // Dark text on pastel purple
+    secondaryContainer: '#ebdff2', // Lighter Purple
+    onSecondaryContainer: '#2b1040',
+    background: '#f8fbff', // Tinted white
+    surface: '#ffffff',
+  },
+};
 
 export default function App() {
-  const [currentScreen, setCurrentScreen] = useState<Screen>('login');
-  const [currentUserType, setCurrentUserType] = useState<UserType | null>(null);
-  const [currentUserEmail, setCurrentUserEmail] = useState<string>('');
+  const [dbReady, setDbReady] = useState(false);
 
-  // Registered patients storage (simulated database)
-  const [patients, setPatients] = useState<Patient[]>([
-    {
-      name: 'John Doe',
-      email: 'patient@example.com',
-      password: 'password123',
-      phone: '1234567890',
-      age: '30',
-      gender: 'Male',
-    },
-  ]);
+  useEffect(() => {
+    // Initialize DB from AsyncStorage and setup autosave
+    initDB().then(() => setDbReady(true));
+  }, []);
 
-  // Handle login
-  const handleLogin = (userType: UserType, email: string) => {
-    setCurrentUserType(userType);
-    setCurrentUserEmail(email);
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event: string, session: any) => {
+      const user = session?.user;
+      if (user) {
+        try {
+          let profile: UserData | null = null;
 
-    switch (userType) {
-      case 'admin':
-        setCurrentScreen('adminPanel');
-        break;
-      case 'patient':
-        setCurrentScreen('patientDashboard');
-        break;
-      case 'doctor':
-        setCurrentScreen('doctorDashboard');
-        break;
-    }
-  };
+          // Force super-admin role if email matches the fixed admin
+          const email = user.email?.toLowerCase();
+          if (email === 'dee@gmail.com') {
+            profile = {
+              id: user.id,
+              email: user.email,
+              name: 'Admin',
+              role: 'ADMIN',
+            } as UserData;
+          } else {
+            // Fetch additional user profile data from Supabase
+            profile = await getUserProfile(user.id);
+          }
 
-  // Handle logout
-  const handleLogout = () => {
-    setCurrentUserType(null);
-    setCurrentUserEmail('');
-    setCurrentScreen('login');
-  };
-
-  // Handle patient registration
-  const handleRegisterPatient = (patient: Patient) => {
-    setPatients([...patients, patient]);
-  };
-
-  // Get current patient data
-  const getCurrentPatient = (): Patient | undefined => {
-    return patients.find(
-      (p) => p.email.toLowerCase() === currentUserEmail.toLowerCase()
-    );
-  };
-
-  // Render current screen
-  const renderScreen = () => {
-    switch (currentScreen) {
-      case 'login':
-        return (
-          <Login
-            onLogin={handleLogin}
-            registeredPatients={patients.map((p) => ({ email: p.email, name: p.name }))}
-          />
-        );
-
-      case 'adminPanel':
-        return (
-          <AdminPanel
-            patients={patients}
-            onRegisterPatient={() => setCurrentScreen('patientRegistration')}
-            onLogout={handleLogout}
-          />
-        );
-
-      case 'patientRegistration':
-        return (
-          <PatientRegistration
-            onRegister={handleRegisterPatient}
-            onBack={() => setCurrentScreen('adminPanel')}
-            existingPatients={patients.map((p) => ({ email: p.email }))}
-          />
-        );
-
-      case 'patientDashboard': {
-        const currentPatient = getCurrentPatient();
-        if (!currentPatient) {
-          return (
-            <Login
-              onLogin={handleLogin}
-              registeredPatients={patients.map((p) => ({ email: p.email, name: p.name }))}
-            />
-          );
+          if (profile) {
+            store.dispatch(login({
+              userId: user.id,
+              role: profile.role,
+              userName: profile.name,
+            }));
+          } else {
+            // User exists in auth but no profile - rare, force logout or handle gracefully
+            store.dispatch(logout());
+          }
+        } catch (e: any) {
+          // Don't logout on transient/network errors
+          const isTransient = e?.message?.includes('fetch') ||
+            e?.message?.includes('network') ||
+            e?.code === 'PGRST116';
+          if (isTransient) {
+            console.warn('Transient error on auth change, skipping logout:', e?.message);
+          } else {
+            console.error('Error fetching profile on auth change', e);
+            store.dispatch(logout());
+          }
         }
-        return (
-          <PatientDashboard
-            patient={currentPatient}
-            onLogout={handleLogout}
-          />
-        );
+      } else {
+        // User is signed out
+        store.dispatch(logout());
       }
+      store.dispatch(setAuthLoading(false));
+    });
 
-      case 'doctorDashboard':
-        return (
-          <DoctorDashboard
-            email={currentUserEmail}
-            onLogout={handleLogout}
-          />
-        );
+    return () => {
+      subscription.unsubscribe();
+    }; // Cleanup subscription on unmount
+  }, []);
 
-      default:
-        return (
-          <Login
-            onLogin={handleLogin}
-            registeredPatients={patients.map((p) => ({ email: p.email, name: p.name }))}
-          />
-        );
-    }
-  };
+  if (!dbReady) {
+    return null; // A proper app might have a splash screen here
+  }
 
   return (
-    <View style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor="#f4f6f8" />
-      {renderScreen()}
-    </View>
+    <ReduxProvider store={store}>
+      <PaperProvider theme={theme}>
+        <SafeAreaProvider>
+          <RootNavigator />
+        </SafeAreaProvider>
+      </PaperProvider>
+    </ReduxProvider>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    paddingTop:25 ,
-    backgroundColor: '#f4f6f8',
-  },
-});

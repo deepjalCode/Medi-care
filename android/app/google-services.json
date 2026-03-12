@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "803384754298",
+    "project_id": "opd-app-604d5",
+    "storage_bucket": "opd-app-604d5.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:803384754298:android:55b57b1a86e70e50ca7bc3",
+        "android_client_info": {
+          "package_name": "com.opdapp"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyC1ixG9DcKIW-2UUswOwb5l2_Pw8eZqdvk"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
