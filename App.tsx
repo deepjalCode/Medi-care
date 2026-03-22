@@ -7,6 +7,8 @@ import RootNavigator from './src/navigation/RootNavigator';
 import { supabase } from './src/services/supabaseSetup';
 import { getUserProfile, UserData } from './src/services/userService';
 import { login, logout, setAuthLoading } from './src/store/slices/authSlice';
+import InAppNotificationBanner from './src/components/InAppNotificationBanner';
+import { useNotifications } from './src/hooks/useNotifications';
 
 
 const theme = {
@@ -25,6 +27,24 @@ const theme = {
     surface: '#ffffff',
   },
 };
+
+// ─── Inner App (needs Redux context for useNotifications) ────────────────────
+
+function AppInner() {
+  const { latestNotification, clearLatest } = useNotifications();
+
+  return (
+    <>
+      <RootNavigator />
+      <InAppNotificationBanner
+        notification={latestNotification}
+        onDismiss={clearLatest}
+      />
+    </>
+  );
+}
+
+// ─── Root App ────────────────────────────────────────────────────────────────
 
 export default function App() {
   const [dbReady, setDbReady] = useState(false);
@@ -97,7 +117,7 @@ export default function App() {
     <ReduxProvider store={store}>
       <PaperProvider theme={theme}>
         <SafeAreaProvider>
-          <RootNavigator />
+          <AppInner />
         </SafeAreaProvider>
       </PaperProvider>
     </ReduxProvider>

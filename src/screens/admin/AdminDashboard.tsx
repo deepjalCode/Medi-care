@@ -107,7 +107,11 @@ export default function AdminDashboard() {
           .lte('created_at', `${todayDate}T23:59:59`),
       ]);
 
-      if (adminRes.data?.name) setAdminName(adminRes.data.name);
+      if (adminRes.data?.name && adminRes.data.name !== 'Admin') {
+        setAdminName(adminRes.data.name);
+      } else {
+        setAdminName('Deepjal');
+      }
       setTotalPatients(patRes.count ?? 0);
       setTotalDoctors(docRes.count ?? 0);
       setTodayTokens(tokenRes.count ?? 0);
@@ -790,7 +794,7 @@ const styles = StyleSheet.create({
     lineHeight: 16,
   },
 
-  // ── Alerts ────────────────────────────────────────────────────────────────
+
   alertCard: {
     borderRadius: 12,
     elevation: 2,
