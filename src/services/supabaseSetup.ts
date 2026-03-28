@@ -4,7 +4,7 @@ import { createClient } from '@supabase/supabase-js';
 
 // Supabase project credentials (OPD-App project)
 const supabaseUrl = 'https://houuwfihumnrudczjynl.supabase.co';
-const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhvdXV3ZmlodW1ucnVkY3pqeW5sIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMyMzg2NTAsImV4cCI6MjA4ODgxNDY1MH0.gy5c7tuDTPvp8cuo9aAi0wnzRP4NRz1O13JWzCCywD0';
+const supabaseAnonKey = 'sb_publishable_iKyp-N-ZXt3BlfWjYZen1g_RvUgdpi2';
 
 /** Primary client — persists the user session in AsyncStorage */
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
