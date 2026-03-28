@@ -30,6 +30,7 @@ interface TodayAppointment {
   patientDisplayId: string;
   patientName: string;
   token: number;
+  tokenNumber: string;
   status: string;
   doctorName: string;
 }
@@ -73,7 +74,7 @@ export default function AdminDashboard() {
   const { userId } = useSelector((state: RootState) => state.auth);
 
   // ── Existing state ────────────────────────────────────────────────────────
-  const [adminName, setAdminName] = useState('Deepjal');
+  const [adminName, setAdminName] = useState('Admin');
   const [totalPatients, setTotalPatients] = useState(0);
   const [totalDoctors, setTotalDoctors] = useState(0);
   const [todayTokens, setTodayTokens] = useState(0);
@@ -107,10 +108,8 @@ export default function AdminDashboard() {
           .lte('created_at', `${todayDate}T23:59:59`),
       ]);
 
-      if (adminRes.data?.name && adminRes.data.name !== 'Admin') {
+      if (adminRes.data?.name) {
         setAdminName(adminRes.data.name);
-      } else {
-        setAdminName('Deepjal');
       }
       setTotalPatients(patRes.count ?? 0);
       setTotalDoctors(docRes.count ?? 0);
@@ -122,7 +121,7 @@ export default function AdminDashboard() {
       const { data: apptData } = await supabase
         .from('appointments')
         .select(`
-          id, token, status,
+          id, token, token_number, status,
           patients ( patient_id, users ( name ) ),
           doctors ( id, users ( name ) )
         `)
@@ -134,6 +133,7 @@ export default function AdminDashboard() {
         patientDisplayId: a.patients?.patient_id ?? '—',
         patientName: a.patients?.users?.name ?? 'Unknown',
         token: a.token ?? 0,
+        tokenNumber: a.token_number ?? `#${a.token ?? 0}`,
         status: a.status ?? 'WAITING',
         doctorName: a.doctors?.users?.name ?? 'Unassigned',
       }));
@@ -343,7 +343,7 @@ export default function AdminDashboard() {
                     ]}
                   >
                     <View style={styles.tokenBadge}>
-                      <Text style={styles.tokenBadgeText}>#{item.token}</Text>
+                      <Text style={styles.tokenBadgeText}>{item.tokenNumber}</Text>
                     </View>
                     <View style={{ flex: 1, marginLeft: 10 }}>
                       <Text style={styles.apptPatientName}>{item.patientName}</Text>

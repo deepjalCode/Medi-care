@@ -36,7 +36,7 @@ export default function ProfilePanel({ visible, onDismiss }: ProfilePanelProps) 
   const theme = useTheme();
   const dispatch = useDispatch();
   const navigation = useNavigation();
-  const { userId, userName, role } = useSelector(
+  const { userId, userName, role, roleId } = useSelector(
     (state: RootState) => state.auth,
   );
 
@@ -56,12 +56,12 @@ export default function ProfilePanel({ visible, onDismiss }: ProfilePanelProps) 
           const [userRes, tokenRes] = await Promise.all([
             supabase
               .from('users')
-              .select('email, phone')
+              .select('phone')
               .eq('id', userId)
               .single(),
             supabase
               .from('appointments')
-              .select('id, token, status, doctor_id, doctors ( users ( name ) )')
+              .select('id, token, token_number, status, doctor_id, doctors ( users ( name ) )')
               .eq('patient_id', userId)
               .order('created_at', { ascending: false }),
           ]);
@@ -71,14 +71,13 @@ export default function ProfilePanel({ visible, onDismiss }: ProfilePanelProps) 
           );
 
           setProfileData({
-            email: userRes.data?.email,
             phone: userRes.data?.phone,
             totalTokens: tokenRes.data?.length ?? 0,
             activeToken: activeToken
               ? {
-                  number: activeToken.token,
+                  number: activeToken.token_number ?? `#${activeToken.token}`,
                   status: activeToken.status,
-                  doctor: activeToken.doctors?.users?.name ?? 'N/A',
+                  doctor: (activeToken as any).doctors?.users?.name ?? 'N/A',
                 }
               : null,
           });
@@ -155,6 +154,9 @@ export default function ProfilePanel({ visible, onDismiss }: ProfilePanelProps) 
                 ? '🩺 Doctor'
                 : '🏥 Patient'}
             </Text>
+            {roleId ? (
+              <Text style={styles.roleIdText}>{roleId}</Text>
+            ) : null}
           </View>
 
           <Divider style={styles.divider} />
@@ -165,12 +167,7 @@ export default function ProfilePanel({ visible, onDismiss }: ProfilePanelProps) 
             <>
               {/* Patient-specific info */}
               {role === 'PATIENT' && profileData && (
-                <View style={styles.section}>
-                  <InfoRow
-                    icon="email-outline"
-                    label="Email"
-                    value={profileData.email ?? 'N/A'}
-                  />
+              <View style={styles.section}>
                   <InfoRow
                     icon="phone-outline"
                     label="Phone"
@@ -187,7 +184,7 @@ export default function ProfilePanel({ visible, onDismiss }: ProfilePanelProps) 
                         Active Token
                       </Text>
                       <Text style={styles.activeTokenNumber}>
-                        #{profileData.activeToken.number}
+                        {profileData.activeToken.number}
                       </Text>
                       <Text style={styles.activeTokenStatus}>
                         {profileData.activeToken.status.replace('_', ' ')} —
@@ -296,6 +293,12 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#666',
     marginTop: 4,
+  },
+  roleIdText: {
+    fontSize: 13,
+    color: '#888',
+    marginTop: 2,
+    fontFamily: 'monospace',
   },
   divider: {
     marginVertical: 16,

@@ -59,30 +59,18 @@ export default function App() {
       const user = session?.user;
       if (user) {
         try {
-          let profile: UserData | null = null;
-
-          // Force super-admin role if email matches the fixed admin
-          const email = user.email?.toLowerCase();
-          if (email === 'dee@gmail.com') {
-            profile = {
-              id: user.id,
-              email: user.email,
-              name: 'Admin',
-              role: 'ADMIN',
-            } as UserData;
-          } else {
-            // Fetch additional user profile data from Supabase
-            profile = await getUserProfile(user.id);
-          }
+          // Fetch profile by UID — role is determined from the profile, not email
+          const profile: UserData | null = await getUserProfile(user.id);
 
           if (profile) {
             store.dispatch(login({
               userId: user.id,
               role: profile.role,
               userName: profile.name,
+              roleId: profile.roleId ?? '',
             }));
           } else {
-            // User exists in auth but no profile - rare, force logout or handle gracefully
+            // User exists in auth but no profile — force logout
             store.dispatch(logout());
           }
         } catch (e: any) {

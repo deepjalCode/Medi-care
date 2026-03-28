@@ -13,18 +13,21 @@ import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '../../store';
 import { logout } from '../../store/slices/authSlice';
 import { supabase } from '../../services/supabaseSetup';
+import { formatGeneratedAt } from '../../utils/formatTokenDate';
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
 interface TokenItem {
   id: string;
   token: number;
+  tokenNumber: string;  // Formatted token: GN-22MAR-0001
   doctorId: string | null;
   doctorName: string;
   reason: string;
+  reasonForVisit: string;
   status: 'WAITING' | 'IN_PROGRESS' | 'COMPLETED';
   visitDate: string;
-  createdAt: string;
+  generatedAt: string;
 }
 
 // ─── Component ─────────────────────────────────────────────────────────────────
@@ -47,7 +50,7 @@ export default function PatientDashboard() {
       const { data, error } = await supabase
         .from('appointments')
         .select(`
-          id, token, reason, status, visit_date, created_at,
+          id, token, token_number, reason, reason_for_visit, status, visit_date, generated_at,
           doctor_id,
           doctors ( users ( name ) )
         `)
@@ -56,17 +59,19 @@ export default function PatientDashboard() {
 
       if (error) throw error;
 
-      const mapped: TokenItem[] = (data ?? []).map((a: any) => ({
-        id: a.id,
-        token: a.token ?? 0,
-        doctorId: a.doctor_id,
-        doctorName: a.doctors?.users?.name
-          ? `Dr. ${a.doctors.users.name}`
+      const mapped: TokenItem[] = (data ?? []).map((a: Record<string, unknown>) => ({
+        id: a.id as string,
+        token: (a.token as number) ?? 0,
+        tokenNumber: (a.token_number as string) ?? `#${a.token ?? 0}`,
+        doctorId: a.doctor_id as string | null,
+        doctorName: (a.doctors as Record<string, unknown>)?.users
+          ? `Dr. ${((a.doctors as Record<string, unknown>).users as Record<string, unknown>)?.name}`
           : 'Any Available Doctor',
-        reason: a.reason ?? '',
-        status: a.status,
-        visitDate: a.visit_date,
-        createdAt: a.created_at,
+        reason: (a.reason as string) ?? '',
+        reasonForVisit: (a.reason_for_visit as string) ?? '',
+        status: a.status as TokenItem['status'],
+        visitDate: a.visit_date as string,
+        generatedAt: (a.generated_at as string) ?? (a.created_at as string),
       }));
 
       setTokens(mapped);
@@ -147,16 +152,16 @@ export default function PatientDashboard() {
                 <Card.Content>
                   <View style={styles.cardHeader}>
                     <View style={styles.tokenBadge}>
-                      <Text style={styles.tokenBadgeText}>#{token.token}</Text>
+                      <Text style={styles.tokenBadgeText}>{token.tokenNumber}</Text>
                     </View>
                     <Title style={styles.dateText}>
-                      {new Date(token.visitDate).toLocaleDateString()}
+                      {formatGeneratedAt(token.generatedAt)}
                     </Title>
                   </View>
 
                   <Paragraph>
                     <Text style={{ fontWeight: 'bold' }}>Reason:</Text>{' '}
-                    {token.reason}
+                    {token.reasonForVisit || token.reason}
                   </Paragraph>
                   <Paragraph>
                     <Text style={{ fontWeight: 'bold' }}>Assigned to:</Text>{' '}

@@ -7,6 +7,7 @@ interface AuthState {
   userId: string | null;
   role: UserRole;
   userName: string | null;
+  roleId: string | null;  // PAT-000001, DOC-000001, ADM-000001
   loading: boolean;
 }
 
@@ -15,7 +16,8 @@ const initialState: AuthState = {
   userId: null,
   role: null,
   userName: null,
-  loading: true, // true by default since we must check Firebase auth state on load
+  roleId: null,
+  loading: true, // true by default since we must check Supabase auth state on load
 };
 
 const authSlice = createSlice({
@@ -24,18 +26,20 @@ const authSlice = createSlice({
   reducers: {
     login: (
       state,
-      action: PayloadAction<{ userId: string; role: UserRole; userName: string }>
+      action: PayloadAction<{ userId: string; role: UserRole; userName: string; roleId: string }>
     ) => {
       state.isAuthenticated = true;
       state.userId = action.payload.userId;
       state.role = action.payload.role;
       state.userName = action.payload.userName;
+      state.roleId = action.payload.roleId;
     },
     logout: (state) => {
       state.isAuthenticated = false;
       state.userId = null;
       state.role = null;
       state.userName = null;
+      state.roleId = null;
       state.loading = false;
     },
     setAuthLoading: (state, action: PayloadAction<boolean>) => {

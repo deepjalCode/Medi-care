@@ -92,33 +92,4 @@ export const fetchDoctorList = async (): Promise<DoctorListItem[]> => {
   }));
 };
 
-// ─── Realtime Subscriptions ────────────────────────────────────────────────────
-
-/**
- * Subscribe to changes on the users and appointments tables so stats update live.
- * Returns an object with an `unsubscribe()` method for cleanup.
- */
-export const subscribeToStatsChanges = (
-  onUpdate: () => void,
-) => {
-  const channel = supabase
-    .channel('global-stats')
-    .on(
-      'postgres_changes',
-      { event: '*', schema: 'public', table: 'users' },
-      () => onUpdate(),
-    )
-    .on(
-      'postgres_changes',
-      { event: '*', schema: 'public', table: 'appointments' },
-      () => onUpdate(),
-    )
-    .subscribe();
-
-  // EXTEND: Add additional table listeners here if stats include more sources
-  return {
-    unsubscribe: () => {
-      supabase.removeChannel(channel);
-    },
-  };
-};
+// Realtime Subscriptions removed per user request

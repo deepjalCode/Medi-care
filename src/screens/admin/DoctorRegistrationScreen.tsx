@@ -1,69 +1,75 @@
+/**
+ * DoctorRegistrationScreen (v2.0)
+ *
+ * Changes:
+ * - Removed email field — uses synthetic email internally
+ * - Doctor ID generated via Supabase RPC (generate_doctor_id)
+ * - Uses registerUser() from userService
+ * - Added category and category_code derived from specialty
+ */
+
 import React, { useState } from 'react';
 import { View, StyleSheet, Alert, KeyboardAvoidingView, Platform, TouchableWithoutFeedback, Keyboard } from 'react-native';
 import { TextInput, Button, Text, Title, useTheme } from 'react-native-paper';
-import { useNavigation } from '@react-navigation/native';
-import { secondarySupabase } from '../../services/supabaseSetup';
-import { createUserProfile } from '../../services/userService';
+import { Picker } from '@react-native-picker/picker';
+import { registerUser } from '../../services/userService';
+
+// ─── Specialty → Category Code Mapping ──────────────────────────────────────
+
+const SPECIALTIES = [
+  { label: 'General Physician', code: 'GN' },
+  { label: 'ENT', code: 'EN' },
+  { label: 'Pediatrics', code: 'PE' },
+  { label: 'Orthopedics', code: 'OR' },
+  { label: 'Dermatology', code: 'DE' },
+] as const;
 
 export default function DoctorRegistrationScreen() {
   const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [phone, setPhone] = useState('');
-  const [specialty, setSpecialty] = useState('');
+  const [selectedSpecialty, setSelectedSpecialty] = useState(SPECIALTIES[0].label);
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [generatedId, setGeneratedId] = useState<string | null>(null);
   
-  const navigation = useNavigation();
   const theme = useTheme();
 
+  const getCategoryCode = (specialty: string): string => {
+    return SPECIALTIES.find(s => s.label === specialty)?.code ?? 'GN';
+  };
+
   const handleRegisterDoctor = async () => {
-    if (!name.trim() || !email.trim() || !password.trim() || !phone.trim() || !specialty.trim()) {
-      Alert.alert('Error', 'Please fill in all required fields including Specialty.');
+    if (!name.trim() || !password.trim() || !phone.trim()) {
+      Alert.alert('Error', 'Please fill in all required fields.');
       return;
     }
 
     setLoading(true);
     try {
-      const { data, error } = await secondarySupabase.auth.signUp({
-        email: email.trim(),
-        password,
-        options: {
-          data: {
-            displayName: name.trim()
-          }
-        }
-      });
-      if (error) throw error;
-      if (!data.user) throw new Error("Could not create doctor account");
+      const categoryCode = getCategoryCode(selectedSpecialty);
 
-      // Generate a unique Doctor ID
-      const docId = `DOC-${Math.floor(100000 + Math.random() * 900000)}`;
-
-      await createUserProfile(data.user.id, {
+      const { generatedId: docId } = await registerUser('DOCTOR', password, {
         name: name.trim(),
-        email: email.trim(),
-        role: 'DOCTOR',
         phone: phone.trim(),
-        specialty: specialty.trim(),
-        doctorId: docId,
+        specialty: selectedSpecialty,
+        category: selectedSpecialty,
+        categoryCode,
       });
 
-      // Clean up the secondary app (sign out the newly created user from the secondary instance)
-      await secondarySupabase.auth.signOut();
-
-      Alert.alert('Success', `Dr. ${name.trim()} registered successfully!`, [
+      setGeneratedId(docId);
+      Alert.alert('Success', `Dr. ${name.trim()} registered!\n\nDoctor ID: ${docId}\nTemp Password: ${password}`, [
         { text: 'OK', onPress: () => {
           setName('');
-          setEmail('');
           setPassword('');
           setPhone('');
-          setSpecialty('');
+          setSelectedSpecialty(SPECIALTIES[0].label);
           setShowPassword(false);
         }}
       ]);
-    } catch (error: any) {
-      Alert.alert('Registration Failed', error.message || 'An error occurred.');
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'An error occurred.';
+      Alert.alert('Registration Failed', message);
     } finally {
       setLoading(false);
     }
@@ -89,16 +95,6 @@ export default function DoctorRegistrationScreen() {
             />
 
             <TextInput
-              label="Email Address"
-              value={email}
-              onChangeText={setEmail}
-              keyboardType="email-address"
-              autoCapitalize="none"
-              mode="outlined"
-              style={styles.input}
-            />
-
-            <TextInput
               label="Phone Number"
               value={phone}
               onChangeText={setPhone}
@@ -107,13 +103,18 @@ export default function DoctorRegistrationScreen() {
               style={styles.input}
             />
 
-            <TextInput
-              label="Specialty (e.g., General, Cardio)"
-              value={specialty}
-              onChangeText={setSpecialty}
-              mode="outlined"
-              style={styles.input}
-            />
+            <Text style={styles.label}>Specialty</Text>
+            <View style={styles.pickerContainer}>
+              <Picker
+                selectedValue={selectedSpecialty}
+                onValueChange={(val) => setSelectedSpecialty(val)}
+                dropdownIconColor="#000"
+              >
+                {SPECIALTIES.map(s => (
+                  <Picker.Item key={s.code} label={s.label} value={s.label} />
+                ))}
+              </Picker>
+            </View>
 
             <TextInput
               label="Temp Password"
@@ -135,8 +136,8 @@ export default function DoctorRegistrationScreen() {
               <Button
                 mode="outlined"
                 onPress={() => {
-                  setName(''); setEmail(''); setPassword('');
-                  setPhone(''); setSpecialty(''); setShowPassword(false);
+                  setName(''); setPassword('');
+                  setPhone(''); setSelectedSpecialty(SPECIALTIES[0].label); setShowPassword(false);
                 }}
                 style={[styles.button, styles.resetBtn]}
                 icon="refresh"
@@ -155,8 +156,15 @@ export default function DoctorRegistrationScreen() {
                 Add Doctor
               </Button>
             </View>
-            
           </View>
+
+          {generatedId && (
+            <View style={styles.successContainer}>
+              <Title style={styles.successTitle}>Generated Doctor ID</Title>
+              <Title selectable style={styles.generatedId}>{generatedId}</Title>
+              <Text style={styles.successHint}>Long-press to copy this ID</Text>
+            </View>
+          )}
         </View>
       </TouchableWithoutFeedback>
     </KeyboardAvoidingView>
@@ -184,13 +192,25 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     textAlign: 'center',
     marginBottom: 8,
-    color: '#002a4d', // Using trust palette onPrimary
+    color: '#002a4d',
   },
   subtitle: {
     fontSize: 14,
     color: '#666',
     textAlign: 'center',
     marginBottom: 24,
+  },
+  label: {
+    fontSize: 14,
+    color: '#555',
+    marginBottom: 6,
+    fontWeight: 'bold',
+  },
+  pickerContainer: {
+    borderWidth: 1,
+    borderColor: '#ccc',
+    borderRadius: 4,
+    marginBottom: 16,
   },
   input: {
     marginBottom: 12,
@@ -211,4 +231,14 @@ const styles = StyleSheet.create({
   submitBtn: {
     flex: 0.6,
   },
+  successContainer: {
+    marginTop: 24,
+    padding: 16,
+    borderRadius: 8,
+    backgroundColor: '#e8f5e9',
+    alignItems: 'center',
+  },
+  successTitle: { fontSize: 16, color: '#2e7d32' },
+  generatedId: { fontSize: 28, color: '#1b5e20', fontWeight: 'bold', marginTop: 8 },
+  successHint: { fontSize: 12, color: '#4caf50', marginTop: 4, fontStyle: 'italic' },
 });

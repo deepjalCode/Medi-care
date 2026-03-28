@@ -47,8 +47,7 @@ export default function SearchPatientScreen() {
       (p) =>
         p.name.toLowerCase().includes(lowerQuery) ||
         (p.phone && p.phone.includes(lowerQuery)) ||
-        (p.patientId && p.patientId.toLowerCase().includes(lowerQuery)) ||
-        p.email.toLowerCase().includes(lowerQuery)
+        (p.patientId && p.patientId.toLowerCase().includes(lowerQuery))
     );
     setFilteredPatients(filtered);
   };
@@ -60,7 +59,6 @@ export default function SearchPatientScreen() {
           <Icon name="account-circle" size={28} color={theme.colors.primary} />
           <Title style={styles.cardTitle}>{item.name}</Title>
         </View>
-        <Paragraph>📧 {item.email}</Paragraph>
         <Paragraph>📞 {item.phone || 'N/A'}</Paragraph>
         <Paragraph>🎂 Age: {item.age ?? 'N/A'}</Paragraph>
         {item.bloodGroup && <Paragraph>🩸 Blood Group: {item.bloodGroup}</Paragraph>}
@@ -74,7 +72,7 @@ export default function SearchPatientScreen() {
   return (
     <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
       <TextInput
-        label="Search by Name, Phone, Email or Patient ID…"
+        label="Search by Name, Phone or Patient ID…"
         value={searchQuery}
         onChangeText={handleSearch}
         mode="outlined"

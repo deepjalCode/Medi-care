@@ -1,13 +1,22 @@
+/**
+ * RegisterPatientScreen (v2.0)
+ *
+ * Changes:
+ * - Removed email field entirely — email is a synthetic internal detail
+ * - Patient ID generated via Supabase RPC (generate_patient_id)
+ * - Uses registerUser() from userService
+ * - Shows generated ID prominently with copy support
+ */
+
 import React, { useState } from 'react';
 import { View, StyleSheet, Alert, ScrollView, Platform, TouchableOpacity } from 'react-native';
 import { TextInput, Button, Title, useTheme, SegmentedButtons, Text } from 'react-native-paper';
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
-import { secondarySupabase } from '../../services/supabaseSetup';
-import { createUserProfile } from '../../services/userService';
+import { registerUser } from '../../services/userService';
+import { formatDisplayDate, formatForDB } from '../../utils/formatTokenDate';
 
 export default function RegisterPatientScreen() {
   const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [age, setAge] = useState('');
   const [dob, setDob] = useState<Date>(new Date(2000, 0, 1));
@@ -21,14 +30,6 @@ export default function RegisterPatientScreen() {
 
   const theme = useTheme();
 
-  // Format Date → "DD/MM/YYYY" for display
-  const formatDisplay = (date: Date) =>
-    `${String(date.getDate()).padStart(2, '0')}/${String(date.getMonth() + 1).padStart(2, '0')}/${date.getFullYear()}`;
-
-  // Format Date → "YYYY-MM-DD" for Supabase
-  const formatForDB = (date: Date) =>
-    `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
-
   const onDateChange = (event: DateTimePickerEvent, selectedDate?: Date) => {
     setShowDatePicker(Platform.OS === 'ios'); // keep open on iOS, close on Android
     if (selectedDate) {
@@ -37,7 +38,7 @@ export default function RegisterPatientScreen() {
   };
 
   const handleRegisterPatient = async () => {
-    if (!name.trim() || !email.trim() || !password.trim() || !age.trim() || !phone.trim()) {
+    if (!name.trim() || !password.trim() || !age.trim() || !phone.trim()) {
       Alert.alert('Error', 'Please fill in all required fields.');
       return;
     }
@@ -49,47 +50,31 @@ export default function RegisterPatientScreen() {
 
     setLoading(true);
     try {
-      const { data, error } = await secondarySupabase.auth.signUp({
-        email: email.trim(),
-        password,
-        options: {
-          data: { displayName: name.trim() }
-        }
-      });
-      if (error) throw error;
-      if (!data.user) throw new Error('Could not create user account');
-
-      const newId = `PAT-${Math.floor(100000 + Math.random() * 900000)}`;
-
-      await createUserProfile(data.user.id, {
+      const { generatedId: newId } = await registerUser('PATIENT', password, {
         name: name.trim(),
-        email: email.trim(),
-        role: 'PATIENT',
         age: parseInt(age.trim(), 10),
         dob: formatForDB(dob),
         gender,
         phone: phone.trim(),
-        patientId: newId,
         bloodGroup: bloodGroup.trim() || undefined,
       });
-
-      await secondarySupabase.auth.signOut();
 
       setGeneratedId(newId);
       Alert.alert(
         'Patient Enrolled!',
-        `Name: ${name.trim()}\nEmail: ${email.trim()}\nTemp Password: ${password}\nPatient ID: ${newId}\n\nPlease share these credentials.`,
+        `Name: ${name.trim()}\nPatient ID: ${newId}\nTemp Password: ${password}\n\nPlease share these credentials with the patient.`,
         [{
           text: 'OK', onPress: () => {
-            setName(''); setEmail(''); setPassword('');
+            setName(''); setPassword('');
             setAge(''); setPhone('');
             setBloodGroup(''); setGender('Male');
             setDob(new Date(2000, 0, 1));
           }
         }]
       );
-    } catch (error: any) {
-      Alert.alert('Registration Failed', error.message || 'An error occurred.');
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'An error occurred.';
+      Alert.alert('Registration Failed', message);
     } finally {
       setLoading(false);
     }
@@ -107,17 +92,6 @@ export default function RegisterPatientScreen() {
           mode="outlined"
           style={styles.input}
           left={<TextInput.Icon icon="account" />}
-        />
-
-        <TextInput
-          label="Email Address"
-          value={email}
-          onChangeText={setEmail}
-          keyboardType="email-address"
-          autoCapitalize="none"
-          mode="outlined"
-          style={styles.input}
-          left={<TextInput.Icon icon="email" />}
         />
 
         <TextInput
@@ -148,7 +122,7 @@ export default function RegisterPatientScreen() {
         >
           <TextInput
             label="Date of Birth"
-            value={formatDisplay(dob)}
+            value={formatDisplayDate(dob)}
             mode="outlined"
             style={styles.input}
             editable={false}
@@ -219,8 +193,9 @@ export default function RegisterPatientScreen() {
 
       {generatedId && (
         <View style={styles.successContainer}>
-          <Title style={styles.successTitle}>Last Created Patient ID</Title>
+          <Title style={styles.successTitle}>Generated Patient ID</Title>
           <Title selectable style={styles.generatedId}>{generatedId}</Title>
+          <Text style={styles.successHint}>Long-press to copy this ID</Text>
         </View>
       )}
     </ScrollView>
@@ -238,4 +213,5 @@ const styles = StyleSheet.create({
   successContainer: { marginTop: 32, padding: 16, borderRadius: 8, backgroundColor: '#e8f5e9', alignItems: 'center' },
   successTitle: { fontSize: 16, color: '#2e7d32' },
   generatedId: { fontSize: 32, color: '#1b5e20', fontWeight: 'bold', marginTop: 8 },
+  successHint: { fontSize: 12, color: '#4caf50', marginTop: 4, fontStyle: 'italic' },
 });

@@ -1,29 +1,43 @@
+/**
+ * LoginScreen (v2.0)
+ *
+ * Changes: Email-based login replaced with Role ID-based login.
+ * Users enter their role ID (PAT-000001, DOC-000001, ADM-000001) + password.
+ * Synthetic email is constructed internally — never exposed to user.
+ */
+
 import React, { useState } from 'react';
-import { View, StyleSheet, Alert, KeyboardAvoidingView, Platform, TouchableWithoutFeedback, Keyboard } from 'react-native';
+import { View, StyleSheet, KeyboardAvoidingView, Platform, TouchableWithoutFeedback, Keyboard } from 'react-native';
 import { TextInput, Button, Text, Title, useTheme, Snackbar } from 'react-native-paper';
-import { useDispatch, useSelector } from 'react-redux';
-import { useNavigation } from '@react-navigation/native';
-import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { AuthStackParamList } from '../../navigation/AuthNavigator';
-import { RootState } from '../../store';
-import { supabase } from '../../services/supabaseSetup';
+import { loginWithRoleId } from '../../services/userService';
+
+// Validates that input matches role ID format: PAT-000001, DOC-000001, ADM-000001
+const ROLE_ID_REGEX = /^(PAT|DOC|ADM)-\d{6}$/i;
 
 export default function LoginScreen() {
-  const [userId, setUserId] = useState('');
+  const [roleId, setRoleId] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [snackbarVisible, setSnackbarVisible] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
-  const dispatch = useDispatch();
-  const navigation = useNavigation<NativeStackNavigationProp<AuthStackParamList>>();
+  const [showPassword, setShowPassword] = useState(false);
   const theme = useTheme();
 
   const handleLogin = async () => {
-    if (!userId.trim()) {
-      setErrorMessage('Please enter a valid email.');
+    const trimmedId = roleId.trim().toUpperCase();
+
+    if (!trimmedId) {
+      setErrorMessage('Please enter your Role ID.');
       setSnackbarVisible(true);
       return;
     }
+
+    if (!ROLE_ID_REGEX.test(trimmedId)) {
+      setErrorMessage('Invalid ID format. Use PAT-000001, DOC-000001, or ADM-000001.');
+      setSnackbarVisible(true);
+      return;
+    }
+
     if (!password.trim()) {
       setErrorMessage('Please enter your password.');
       setSnackbarVisible(true);
@@ -32,21 +46,16 @@ export default function LoginScreen() {
 
     setLoading(true);
     try {
-      const { error } = await supabase.auth.signInWithPassword({
-        email: userId.trim(),
-        password,
-      });
-      if (error) throw error;
-      // Redux dispatch is now handled securely in App.tsx via onAuthStateChange
-    } catch (error: any) {
-      setErrorMessage(error.message || 'Invalid credentials');
+      await loginWithRoleId(trimmedId, password);
+      // Redux dispatch is handled securely in App.tsx via onAuthStateChange
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Invalid credentials';
+      setErrorMessage(message);
       setSnackbarVisible(true);
     } finally {
       setLoading(false);
     }
   };
-
-
 
   return (
     <KeyboardAvoidingView 
@@ -57,14 +66,13 @@ export default function LoginScreen() {
         <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
           <View style={styles.formContainer}>
             <Title style={styles.title}>Welcome to OPD System</Title>
-            <Text style={styles.subtitle}>Sign in to continue</Text>
+            <Text style={styles.subtitle}>Sign in with your Role ID</Text>
 
             <TextInput
-              label="Email"
-              value={userId}
-              onChangeText={setUserId}
-              autoCapitalize="none"
-              keyboardType="email-address"
+              label="Role ID (e.g. PAT-000001)"
+              value={roleId}
+              onChangeText={setRoleId}
+              autoCapitalize="characters"
               mode="outlined"
               style={styles.input}
               left={<TextInput.Icon icon="account" />}
@@ -74,10 +82,16 @@ export default function LoginScreen() {
               label="Password"
               value={password}
               onChangeText={setPassword}
-              secureTextEntry
+              secureTextEntry={!showPassword}
               mode="outlined"
               style={styles.input}
               left={<TextInput.Icon icon="lock" />}
+              right={
+                <TextInput.Icon
+                  icon={showPassword ? 'eye-off' : 'eye'}
+                  onPress={() => setShowPassword(prev => !prev)}
+                />
+              }
             />
 
             <Button
@@ -92,7 +106,7 @@ export default function LoginScreen() {
             </Button>
             
             <Text style={styles.hint}>
-              Authentication now securely managed via Supabase.
+              Enter your assigned ID (PAT / DOC / ADM) and password.
             </Text>
           </View>
 

@@ -4,13 +4,11 @@ import {
   DoctorListItem,
   fetchGlobalStats,
   fetchDoctorList,
-  subscribeToStatsChanges,
 } from '../services/statsService';
 
 /**
- * Custom hook that provides live global statistics and doctor list.
- * Subscribes to Supabase Realtime so values auto-refresh when
- * users or appointments change in the database.
+ * Custom hook that provides global statistics and doctor list.
+ * Fetches data statically on mount (non-realtime).
  */
 export function useGlobalStats() {
   const [stats, setStats] = useState<GlobalStats>({
@@ -38,17 +36,7 @@ export function useGlobalStats() {
   }, []);
 
   useEffect(() => {
-    // Initial fetch
     refresh();
-
-    // Realtime subscription — re-fetch whenever users or appointments change
-    const sub = subscribeToStatsChanges(() => {
-      refresh();
-    });
-
-    return () => {
-      sub.unsubscribe();
-    };
   }, [refresh]);
 
   return { stats, doctors, loading, refresh };

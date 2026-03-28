@@ -14,6 +14,7 @@ import { RootState } from '../../store';
 import { logout } from '../../store/slices/authSlice';
 import { supabase } from '../../services/supabaseSetup';
 import { createNotification } from '../../services/NotificationService';
+import { formatGeneratedAtCompact } from '../../utils/formatTokenDate';
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
@@ -22,9 +23,11 @@ interface QueueItem {
   patientId: string;
   patientName: string;
   token: number;
+  tokenNumber: string;  // Formatted: GN-22MAR-0001
   reason: string;
+  reasonForVisit: string;
   status: 'WAITING' | 'IN_PROGRESS' | 'COMPLETED';
-  createdAt: string;
+  generatedAt: string;
 }
 
 // ─── Component ─────────────────────────────────────────────────────────────────
@@ -50,7 +53,7 @@ export default function DoctorDashboard() {
       const { data, error } = await supabase
         .from('appointments')
         .select(`
-          id, token, reason, status, created_at,
+          id, token, token_number, reason, reason_for_visit, status, generated_at,
           patient_id,
           patients ( users ( name ) )
         `)
@@ -61,14 +64,16 @@ export default function DoctorDashboard() {
 
       if (error) throw error;
 
-      const mapped: QueueItem[] = (data ?? []).map((a: any) => ({
-        id: a.id,
-        patientId: a.patient_id,
-        patientName: a.patients?.users?.name ?? 'Unknown',
-        token: a.token ?? 0,
-        reason: a.reason ?? '',
-        status: a.status,
-        createdAt: a.created_at,
+      const mapped: QueueItem[] = (data ?? []).map((a: Record<string, unknown>) => ({
+        id: a.id as string,
+        patientId: a.patient_id as string,
+        patientName: ((a.patients as Record<string, unknown>)?.users as Record<string, unknown>)?.name as string ?? 'Unknown',
+        token: (a.token as number) ?? 0,
+        tokenNumber: (a.token_number as string) ?? `#${a.token ?? 0}`,
+        reason: (a.reason as string) ?? '',
+        reasonForVisit: (a.reason_for_visit as string) ?? '',
+        status: a.status as QueueItem['status'],
+        generatedAt: (a.generated_at as string) ?? (a.created_at as string),
       }));
 
       setQueue(mapped);
@@ -139,10 +144,7 @@ export default function DoctorDashboard() {
 
   // ── Helpers ────────────────────────────────────────────────────────────────
 
-  const formatTime = (isoString: string) => {
-    const d = new Date(isoString);
-    return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  };
+  const formatTime = (isoString: string) => formatGeneratedAtCompact(isoString);
 
   // ── Pull-to-refresh ────────────────────────────────────────────────────────
 
@@ -174,7 +176,7 @@ export default function DoctorDashboard() {
                 <Card.Content>
                   <View style={styles.cardHeader}>
                     <View style={styles.tokenBadge}>
-                      <Text style={styles.tokenBadgeText}>#{appt.token}</Text>
+                      <Text style={styles.tokenBadgeText}>{appt.tokenNumber}</Text>
                     </View>
                     <Title style={styles.patientName}>
                       {appt.patientName}
@@ -183,11 +185,11 @@ export default function DoctorDashboard() {
 
                   <Paragraph>
                     <Text style={{ fontWeight: 'bold' }}>Reason:</Text>{' '}
-                    {appt.reason}
+                    {appt.reasonForVisit || appt.reason}
                   </Paragraph>
                   <Paragraph>
                     <Text style={{ fontWeight: 'bold' }}>Registered:</Text>{' '}
-                    {formatTime(appt.createdAt)}
+                    {formatTime(appt.generatedAt)}
                   </Paragraph>
                   <Paragraph>
                     <Text style={{ fontWeight: 'bold' }}>Status:</Text>{' '}

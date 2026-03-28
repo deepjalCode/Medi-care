@@ -1,32 +1,49 @@
-# Seed Data — 5 Doctors
+# Seed Data Documentation — v2.0
 
-## Overview
-The seed script creates **5 doctors** (one per category):
+## Doctor Seed Accounts
 
-| Doctor Name       | Category           | Email                         | Password    |
-|-------------------|--------------------|-------------------------------|-------------|
-| Dr. Aryan Mehta   | General Physician  | aryan.mehta@medicare.com      | Doctor@123  |
-| Dr. Kavita Rao    | ENT                | kavita.rao@medicare.com       | Doctor@123  |
-| Dr. Anjali Bose   | Pediatrics         | anjali.bose@medicare.com      | Doctor@123  |
-| Dr. Harish Reddy  | Orthopedics        | harish.reddy@medicare.com     | Doctor@123  |
-| Dr. Nisha Agarwal | Dermatology        | nisha.agarwal@medicare.com    | Doctor@123  |
+All 5 doctors are created via the `seedDoctors()` function in `src/scripts/seedDoctors.ts`.
 
-## How to Run
+| Doctor | Specialty | Category Code | Login ID | Password |
+|---|---|---|---|---|
+| Dr. Aryan Mehta | General Physician | GN | DOC-000001 | Doctor@1234 |
+| Dr. Kavita Rao | ENT | EN | DOC-000002 | Doctor@1234 |
+| Dr. Anjali Bose | Pediatrics | PE | DOC-000003 | Doctor@1234 |
+| Dr. Harish Reddy | Orthopedics | OR | DOC-000004 | Doctor@1234 |
+| Dr. Nisha Agarwal | Dermatology | DE | DOC-000005 | Doctor@1234 |
 
-### Option 1 — From CLI
+## How Authentication Works
+
+- **Login**: Users enter their Role ID (e.g., `DOC-000001`) + password
+- **Internal mechanism**: A synthetic email (`doc-000001@opd.internal`) is constructed internally for Supabase Auth
+- **No real email is required or displayed** — the synthetic email is purely an implementation detail
+
+## Running the Seed Script
+
 ```bash
 npx ts-node src/scripts/seedDoctors.ts
 ```
 
-### Option 2 — From Admin Dashboard
-The `seedDoctors()` function is exported and can be called from within the app (e.g., a "Seed Data" button on the Admin panel).
+Or call `seedDoctors()` from the Admin Dashboard.
 
-```typescript
-import { seedDoctors } from '../scripts/seedDoctors';
+The script is **idempotent** — it checks for existing accounts by synthetic email before creating new ones.
 
-const result = await seedDoctors();
-// result = { created: 5, skipped: 0 }
-```
+## Admin Account
 
-## Idempotency
-The script checks if a user with the given email already exists before creating. Running it multiple times will **not** create duplicate doctors.
+The admin must be created manually or via a separate seed:
+
+| Field | Value |
+|---|---|
+| Login ID | ADM-000001 |
+| Password | Admin@1234 |
+| Synthetic Email | adm-000001@opd.internal |
+
+## Token Format
+
+Tokens use the format: `{CATEGORY_CODE}-{DATE}-{SEQUENCE}`
+
+Examples:
+- `GN-22MAR-0001` — First General Physician token on March 22
+- `EN-22MAR-0003` — Third ENT token on March 22
+
+Sequence resets daily per category via the `token_counters` table.
