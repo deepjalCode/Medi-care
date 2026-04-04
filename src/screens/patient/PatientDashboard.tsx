@@ -83,9 +83,10 @@ export default function PatientDashboard() {
     }
   }, [userId]);
 
-  // ── Realtime subscription ──────────────────────────────────────────────────
+  // ── Realtime subscription (smart state patching — no full re-fetch per event) ──
 
   useEffect(() => {
+    // Initial load
     fetchTokens();
 
     const channel = supabase
@@ -98,8 +99,24 @@ export default function PatientDashboard() {
           table: 'appointments',
           filter: `patient_id=eq.${userId}`,
         },
-        () => {
-          fetchTokens(); // Re-fetch on any change to this patient's tokens
+        (payload) => {
+          const { eventType, new: newRow, old: oldRow } = payload as any;
+
+          if (eventType === 'INSERT') {
+            // New token assigned — do a targeted fetch since we need the joined doctor name
+            fetchTokens();
+          } else if (eventType === 'UPDATE' && newRow) {
+            // Status change — patch in place, no full re-fetch needed
+            setTokens((prev) =>
+              prev.map((t) =>
+                t.id === newRow.id
+                  ? { ...t, status: newRow.status as TokenItem['status'] }
+                  : t,
+              ),
+            );
+          } else if (eventType === 'DELETE' && oldRow) {
+            setTokens((prev) => prev.filter((t) => t.id !== oldRow.id));
+          }
         },
       )
       .subscribe();

@@ -16,80 +16,55 @@ export interface DoctorListItem {
   isAvailable: boolean;
 }
 
-// ─── Fetch Stats ───────────────────────────────────────────────────────────────
-
 /**
- * Fetches global statistics from Supabase in a single call.
- * Uses count queries for totals; derives tokensToday from today's appointments.
+ * Fetches global statistics via a secure Postgres function.
+ * Uses a SECURITY DEFINER RPC (`get_public_stats`) that returns only
+ * aggregated counts — works for both anon and authenticated users
+ * without exposing row-level data through RLS.
  */
 export const fetchGlobalStats = async (): Promise<GlobalStats> => {
-  const todayDate = new Date().toISOString().split('T')[0];
+  const { data, error } = await supabase.rpc('get_public_stats');
 
-  const [patRes, docRes, tokenRes] = await Promise.all([
-    supabase
-      .from('users')
-      .select('id', { count: 'exact', head: true })
-      .eq('role', 'PATIENT'),
-    supabase
-      .from('users')
-      .select('id', { count: 'exact', head: true })
-      .eq('role', 'DOCTOR'),
-    supabase
-      .from('appointments')
-      .select('id', { count: 'exact', head: true })
-      .gte('created_at', `${todayDate}T00:00:00`)
-      .lte('created_at', `${todayDate}T23:59:59`),
-  ]);
+  if (error) {
+    console.error('fetchGlobalStats RPC error:', error.message);
+    return { totalPatients: 0, totalDoctors: 0, tokensToday: 0, activeDoctors: 0 };
+  }
 
-  // Active doctors = doctors who have a WAITING or IN_PROGRESS appointment today
-  const { data: activeData } = await supabase
-    .from('appointments')
-    .select('doctor_id')
-    .eq('visit_date', todayDate)
-    .in('status', ['WAITING', 'IN_PROGRESS']);
-
-  const activeDoctorIds = new Set(
-    (activeData ?? []).map((a: any) => a.doctor_id).filter(Boolean),
-  );
+  // The RPC returns JSON. Supabase-js may deliver:
+  //   - Direct object:  { total_patients, total_doctors, ... }
+  //   - Nested wrapper: { get_public_stats: { total_patients, ... } }  (older clients)
+  //   - Or null
+  const stats = data?.get_public_stats ?? data;
 
   return {
-    totalPatients: patRes.count ?? 0,
-    totalDoctors: docRes.count ?? 0,
-    tokensToday: tokenRes.count ?? 0,
-    activeDoctors: activeDoctorIds.size,
+    totalPatients: stats?.total_patients ?? 0,
+    totalDoctors: stats?.total_doctors ?? 0,
+    tokensToday: stats?.tokens_today ?? 0,
+    activeDoctors: stats?.active_doctors ?? 0,
   };
 };
 
 // ─── Fetch Doctor List ─────────────────────────────────────────────────────────
 
 /**
- * Returns a list of all doctors with name, specialty, and availability.
- * Availability is derived from whether the doctor has active appointments today.
+ * Returns a list of all doctors with name, specialty, and live availability.
+ * Uses doctors.availability column directly.
  */
 export const fetchDoctorList = async (): Promise<DoctorListItem[]> => {
-  const todayDate = new Date().toISOString().split('T')[0];
+  const { data, error } = await supabase
+    .from('doctors')
+    .select('id, speciality, availability, users ( name )')
+    .order('availability', { ascending: false }); // available doctors first
 
-  const [docRes, activeRes] = await Promise.all([
-    supabase
-      .from('doctors')
-      .select('id, speciality, users ( name )'),
-    supabase
-      .from('appointments')
-      .select('doctor_id')
-      .eq('visit_date', todayDate)
-      .in('status', ['WAITING', 'IN_PROGRESS']),
-  ]);
+  if (error) {
+    console.error('fetchDoctorList error:', error.message);
+    return [];
+  }
 
-  const activeDoctorIds = new Set(
-    (activeRes.data ?? []).map((a: any) => a.doctor_id).filter(Boolean),
-  );
-
-  return (docRes.data ?? []).map((d: any) => ({
+  return (data ?? []).map((d: any) => ({
     id: d.id,
     name: d.users?.name ?? 'Doctor',
     specialty: d.speciality ?? 'General',
-    isAvailable: activeDoctorIds.has(d.id),
+    isAvailable: d.availability ?? false,
   }));
 };
-
-// Realtime Subscriptions removed per user request

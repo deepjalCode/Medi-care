@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import {
   View,
   StyleSheet,
@@ -92,21 +92,44 @@ export default function AdminDashboard() {
 
   // ─── Data Fetching ─────────────────────────────────────────────────────────
 
+  // TTL cache ref — prevents re-running 7 queries on every back-navigation.
+  // Pull-to-refresh always bypasses this.
+  const lastFetchedAt = useRef<number>(0);
+  const CACHE_TTL_MS = 15_000; // 15 seconds
+
   const fetchStats = async () => {
     try {
       const todayDate = new Date().toISOString().split('T')[0];
 
-      // ── Existing queries ────────────────────────────────────────────────
-      const [adminRes, patRes, docRes, tokenRes] = await Promise.all([
-        supabase.from('users').select('name').eq('id', userId).single(),
-        supabase.from('users').select('id', { count: 'exact', head: true }).eq('role', 'PATIENT'),
-        supabase.from('users').select('id', { count: 'exact', head: true }).eq('role', 'DOCTOR'),
-        supabase
-          .from('appointments')
-          .select('id', { count: 'exact', head: true })
-          .gte('created_at', `${todayDate}T00:00:00`)
-          .lte('created_at', `${todayDate}T23:59:59`),
-      ]);
+      // ── All queries fired in one parallel batch ─────────────────────────
+      const [adminRes, patRes, docRes, tokenRes, apptResult, docListResult, recentResult] =
+        await Promise.all([
+          supabase.from('users').select('name').eq('id', userId).single(),
+          supabase.from('users').select('id', { count: 'exact', head: true }).eq('role', 'PATIENT'),
+          supabase.from('users').select('id', { count: 'exact', head: true }).eq('role', 'DOCTOR'),
+          supabase
+            .from('appointments')
+            .select('id', { count: 'exact', head: true })
+            .gte('created_at', `${todayDate}T00:00:00`)
+            .lte('created_at', `${todayDate}T23:59:59`),
+          supabase
+            .from('appointments')
+            .select(`
+              id, token, token_number, status,
+              patients ( patient_id, users ( name ) ),
+              doctors ( id, users ( name ) )
+            `)
+            .eq('visit_date', todayDate)
+            .order('token', { ascending: true }),
+          supabase
+            .from('doctors')
+            .select(`id, doc_id, users ( name )`),
+          supabase
+            .from('appointments')
+            .select(`id, status, token, created_at, patients ( users ( name ) )`)
+            .order('created_at', { ascending: false })
+            .limit(5),
+        ]);
 
       if (adminRes.data?.name) {
         setAdminName(adminRes.data.name);
@@ -115,19 +138,9 @@ export default function AdminDashboard() {
       setTotalDoctors(docRes.count ?? 0);
       setTodayTokens(tokenRes.count ?? 0);
 
-      // ── New queries ─────────────────────────────────────────────────────
+      const apptData = apptResult.data;
 
-      // 1 · Today's appointments (with patient + doctor names)
-      const { data: apptData } = await supabase
-        .from('appointments')
-        .select(`
-          id, token, token_number, status,
-          patients ( patient_id, users ( name ) ),
-          doctors ( id, users ( name ) )
-        `)
-        .eq('visit_date', todayDate)
-        .order('token', { ascending: true });
-
+      // 1 · Map today's appointments
       const mappedAppts: TodayAppointment[] = (apptData ?? []).map((a: any) => ({
         id: a.id,
         patientDisplayId: a.patients?.patient_id ?? '—',
@@ -144,26 +157,20 @@ export default function AdminDashboard() {
       const seen = mappedAppts.filter(a => a.status === 'COMPLETED').length;
       setPatientsWaiting(waiting);
       setPatientsSeenToday(seen);
-      // Avg wait time — placeholder (0) unless we have real timestamps
-      setAvgWaitTime(waiting > 0 ? Math.round((waiting * 8)) : 0); // ~8 min per patient estimate
+      setAvgWaitTime(waiting > 0 ? Math.round((waiting * 8)) : 0);
 
       // 3 · All doctors (name + derive active status from today's appointments)
-      const { data: docData } = await supabase
-        .from('doctors')
-        .select(`id, doc_id, users ( name )`);
-
       const activeDoctorIds = new Set(
         mappedAppts
           .filter(a => a.status === 'WAITING' || a.status === 'IN_PROGRESS')
           .map((_a: any) => {
-            // find the doctor UUID from apptData
             const raw = (apptData ?? []).find((r: any) => r.id === _a.id) as any;
             return (raw?.doctors as any)?.id ?? null;
           })
           .filter(Boolean)
       );
 
-      const mappedDoctors: DoctorInfo[] = (docData ?? []).map((d: any) => ({
+      const mappedDoctors: DoctorInfo[] = (docListResult.data ?? []).map((d: any) => ({
         id: d.id,
         name: d.users?.name ?? 'Doctor',
         docId: d.doc_id ?? '',
@@ -194,13 +201,7 @@ export default function AdminDashboard() {
       );
 
       // 5 · Recent activity — last 5 appointment events
-      const { data: recentData } = await supabase
-        .from('appointments')
-        .select(`id, status, token, created_at, patients ( users ( name ) )`)
-        .order('created_at', { ascending: false })
-        .limit(5);
-
-      const activityItems: ActivityItem[] = (recentData ?? []).map((r: any) => {
+      const activityItems: ActivityItem[] = (recentResult.data ?? []).map((r: any) => {
         let icon = 'ticket-confirmation-outline';
         let action = `Token #${r.token} Generated`;
         if (r.status === 'COMPLETED') {
@@ -231,14 +232,23 @@ export default function AdminDashboard() {
 
   useFocusEffect(
     useCallback(() => {
-      setLoading(true);
-      fetchStats();
+      const now = Date.now();
+      const isStale = now - lastFetchedAt.current > CACHE_TTL_MS;
+      if (isStale) {
+        setLoading(true);
+        fetchStats().then(() => {
+          lastFetchedAt.current = Date.now();
+        });
+      }
     }, [])
   );
 
   const onRefresh = () => {
+    // Pull-to-refresh always forces a fresh fetch regardless of TTL
     setRefreshing(true);
-    fetchStats();
+    fetchStats().then(() => {
+      lastFetchedAt.current = Date.now();
+    });
   };
 
   // ─── Alert flags ───────────────────────────────────────────────────────────
@@ -545,7 +555,11 @@ export default function AdminDashboard() {
           {/* ── Logout (moved to bottom) ──────────────────────────────────── */}
           <Button
             mode="outlined"
-            onPress={() => dispatch(logout())}
+            onPress={async () => {
+              // Must sign out of Supabase first so the persisted session is cleared
+              try { await supabase.auth.signOut(); } catch (e) { console.error('Logout error', e); }
+              dispatch(logout());
+            }}
             style={styles.logoutBtn}
             icon="logout"
           >

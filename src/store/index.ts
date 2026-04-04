@@ -24,12 +24,16 @@ export const initDB = async () => {
     console.error('Failed to fetch DB from storage', e);
   }
 
-  // Subscribe to changes and save DB slice
+  // Debounced subscriber — batches AsyncStorage writes so we don't
+  // hit the disk on every single dispatch (e.g. during rapid state updates).
+  let debounceTimer: ReturnType<typeof setTimeout> | null = null;
   store.subscribe(() => {
-    const state = store.getState();
-    const dbState = state.db;
-    AsyncStorage.setItem('@opd_db', JSON.stringify(dbState)).catch((e) => {
-      console.error('Failed to save DB', e);
-    });
+    if (debounceTimer) clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(() => {
+      const dbState = store.getState().db;
+      AsyncStorage.setItem('@opd_db', JSON.stringify(dbState)).catch((e) => {
+        console.error('Failed to save DB', e);
+      });
+    }, 500);
   });
 };

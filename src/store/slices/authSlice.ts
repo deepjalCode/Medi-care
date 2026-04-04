@@ -33,6 +33,7 @@ const authSlice = createSlice({
       state.role = action.payload.role;
       state.userName = action.payload.userName;
       state.roleId = action.payload.roleId;
+      state.loading = false;
     },
     logout: (state) => {
       state.isAuthenticated = false;

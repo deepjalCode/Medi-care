@@ -1,3 +1,12 @@
+/**
+ * DoctorNavigator (v2.0)
+ *
+ * Changes:
+ * - Imports useNotificationContext to get unreadCount
+ * - Passes showNotificationBell, unreadCount, onNotificationPress to AppHeader
+ * - Adds NotificationScreen modal triggered by bell tap
+ */
+
 import React, { useState } from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import DoctorDashboard from '../screens/doctor/DoctorDashboard';
@@ -5,6 +14,10 @@ import PatientSearchScreen from '../screens/doctor/PatientSearchScreen';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import AppHeader from '../components/AppHeader';
 import ProfilePanel from '../components/ProfilePanel';
+// --- ADDED: Notification context + screen (Feature 2 & 3) ---
+import { useNotificationContext } from '../context/NotificationContext';
+import NotificationScreen from '../screens/NotificationScreen';
+// --- END ADDED ---
 
 export type DoctorTabParamList = {
   Dashboard: undefined;
@@ -21,6 +34,11 @@ const TITLES: Record<string, string> = {
 export default function DoctorNavigator() {
   const [profileVisible, setProfileVisible] = useState(false);
 
+  // --- ADDED: Notification bell state (Feature 2 & 3) ---
+  const [notifVisible, setNotifVisible] = useState(false);
+  const { unreadCount } = useNotificationContext();
+  // --- END ADDED ---
+
   return (
     <>
       <Tab.Navigator
@@ -35,6 +53,11 @@ export default function DoctorNavigator() {
             <AppHeader
               title={TITLES[route.name] ?? route.name}
               onProfilePress={() => setProfileVisible(true)}
+              // --- ADDED: Notification bell props (Feature 3) ---
+              showNotificationBell={true}
+              unreadCount={unreadCount}
+              onNotificationPress={() => setNotifVisible(true)}
+              // --- END ADDED ---
             />
           ),
         })}
@@ -47,6 +70,13 @@ export default function DoctorNavigator() {
         visible={profileVisible}
         onDismiss={() => setProfileVisible(false)}
       />
+
+      {/* --- ADDED: Notification modal (Feature 2 & 3) --- */}
+      <NotificationScreen
+        visible={notifVisible}
+        onClose={() => setNotifVisible(false)}
+      />
+      {/* --- END ADDED --- */}
     </>
   );
 }

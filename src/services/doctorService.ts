@@ -1,8 +1,9 @@
 /**
- * Doctor Service (v2.0)
+ * Doctor Service (v2.1)
  *
- * Provides functions to fetch doctor categories and doctors from
- * the database dynamically. No hardcoded category lists.
+ * Performance improvements:
+ * - getDoctorCategories() now uses a module-level in-memory cache (5-min TTL)
+ *   so repeated form opens don't fire redundant DB queries.
  */
 
 import { supabase } from './supabaseSetup';
@@ -23,14 +24,35 @@ export interface DoctorOption {
   photoUrl?: string;
 }
 
+// ─── Module-level cache for doctor categories ──────────────────────────────────
+// Categories change very rarely (only when a new doctor speciality is registered).
+// A 5-minute in-process cache eliminates redundant DB round-trips without any
+// external state management.
+
+const CATEGORY_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+
+let categoryCache: {
+  data: DoctorCategory[];
+  fetchedAt: number;
+} | null = null;
+
 /**
  * Fetches unique doctor categories from the doctors table.
  * Returns distinct category + category_code pairs.
+ * Results are cached in-memory for 5 minutes.
  */
 export async function getDoctorCategories(): Promise<DoctorCategory[]> {
+  const now = Date.now();
+
+  // Return cached result if still fresh
+  if (categoryCache && now - categoryCache.fetchedAt < CATEGORY_CACHE_TTL_MS) {
+    return categoryCache.data;
+  }
+
   const { data, error } = await supabase
     .from('doctors')
-    .select('category, category_code');
+    .select('category, category_code')
+    .order('category_code');
 
   if (error) throw error;
 
@@ -48,6 +70,9 @@ export async function getDoctorCategories(): Promise<DoctorCategory[]> {
       });
     }
   }
+
+  // Store in cache
+  categoryCache = { data: categories, fetchedAt: now };
 
   return categories;
 }

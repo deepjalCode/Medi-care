@@ -1,14 +1,15 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   GlobalStats,
   DoctorListItem,
   fetchGlobalStats,
   fetchDoctorList,
 } from '../services/statsService';
+import { supabase } from '../services/supabaseSetup';
 
 /**
  * Custom hook that provides global statistics and doctor list.
- * Fetches data statically on mount (non-realtime).
+ * Now dynamically updates via Supabase Realtime subscriptions.
  */
 export function useGlobalStats() {
   const [stats, setStats] = useState<GlobalStats>({
@@ -19,6 +20,8 @@ export function useGlobalStats() {
   });
   const [doctors, setDoctors] = useState<DoctorListItem[]>([]);
   const [loading, setLoading] = useState(true);
+
+  const fetchTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const refresh = useCallback(async () => {
     try {
@@ -35,9 +38,40 @@ export function useGlobalStats() {
     }
   }, []);
 
-  useEffect(() => {
-    refresh();
+  const triggerRealtimeRefresh = useCallback(() => {
+    if (fetchTimeout.current) clearTimeout(fetchTimeout.current);
+    fetchTimeout.current = setTimeout(() => {
+      refresh();
+    }, 500); // Debounce burst events
   }, [refresh]);
+
+  useEffect(() => {
+    refresh(); // Initial fetch
+
+    const channel = supabase
+      .channel('global_stats_changes')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'users' },
+        triggerRealtimeRefresh
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'appointments' },
+        triggerRealtimeRefresh
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'doctors' },
+        triggerRealtimeRefresh
+      )
+      .subscribe();
+
+    return () => {
+      if (fetchTimeout.current) clearTimeout(fetchTimeout.current);
+      supabase.removeChannel(channel);
+    };
+  }, [refresh, triggerRealtimeRefresh]);
 
   return { stats, doctors, loading, refresh };
 }

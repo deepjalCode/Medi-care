@@ -1,11 +1,11 @@
 import React, { useEffect, useRef } from 'react';
-import { Animated, StyleSheet, View } from 'react-native';
+import { Animated, StyleSheet, TouchableWithoutFeedback, View } from 'react-native';
 import { Text } from 'react-native-paper';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
-import { Notification } from '../services/NotificationService';
+import { InAppNotification } from '../context/NotificationContext';
 
 interface Props {
-  notification: Notification | null;
+  notification: InAppNotification | null;
   onDismiss: () => void;
 }
 
@@ -55,22 +55,33 @@ export default function InAppNotificationBanner({
 
   if (!notification) return null;
 
+  // Derive a title/body from the message string (format: "Title: body")
+  const colonIdx = notification.message.indexOf(': ');
+  const bannerTitle = colonIdx > -1
+    ? notification.message.slice(0, colonIdx)
+    : 'Notification';
+  const bannerBody = colonIdx > -1
+    ? notification.message.slice(colonIdx + 2)
+    : notification.message;
+
   return (
-    <Animated.View
-      style={[styles.container, { transform: [{ translateY }] }]}
-    >
-      <View style={styles.content}>
-        <Icon name="bell-ring-outline" size={24} color="#fff" style={styles.icon} />
-        <View style={styles.textContainer}>
-          <Text style={styles.title} numberOfLines={1}>
-            {notification.title}
-          </Text>
-          <Text style={styles.body} numberOfLines={2}>
-            {notification.body}
-          </Text>
+    <TouchableWithoutFeedback onPress={dismiss}>
+      <Animated.View
+        style={[styles.container, { transform: [{ translateY }] }]}
+      >
+        <View style={styles.content}>
+          <Icon name="bell-ring-outline" size={24} color="#fff" style={styles.icon} />
+          <View style={styles.textContainer}>
+            <Text style={styles.title} numberOfLines={1}>
+              {bannerTitle}
+            </Text>
+            <Text style={styles.body} numberOfLines={2}>
+              {bannerBody}
+            </Text>
+          </View>
         </View>
-      </View>
-    </Animated.View>
+      </Animated.View>
+    </TouchableWithoutFeedback>
   );
 }
 

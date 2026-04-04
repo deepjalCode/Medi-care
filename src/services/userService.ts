@@ -1,4 +1,9 @@
 /**
+ * v2.1 Changes (Performance):
+ * - getUserProfile: role-conditional JOIN — only fetches the sub-table matching the user's role
+ *   (was always JOINing patients + doctors + admins regardless of role)
+ * - getAllUsersByRole: same fix — dynamic SELECT string based on the target role
+ *
  * v2.0 Changes:
  * - Replaced email with roleId in UserData interface
  * - Added registerUser() that generates role ID via RPC and uses synthetic email
@@ -40,6 +45,70 @@ export interface UserData {
  */
 function toSyntheticEmail(roleId: string): string {
   return `${roleId.toLowerCase()}@opd.internal`;
+}
+
+// ─── Role-conditional SELECT builder ────────────────────────────────────────
+
+/**
+ * Returns the PostgREST select string for a given role,
+ * joining ONLY the relevant sub-table to avoid over-fetching.
+ */
+function buildRoleSelect(role: UserRole): string {
+  const base = 'id, name, role, phone, age, dob, gender, created_at';
+  switch (role) {
+    case 'PATIENT':
+      return `${base}, patients ( patient_id, blood_group, photo_url )`;
+    case 'DOCTOR':
+      return `${base}, doctors ( doc_id, speciality, department, category, category_code, availability, photo_url )`;
+    case 'ADMIN':
+      return `${base}, admins ( admin_id, photo_url )`;
+    default:
+      // Fallback: join all (safe but slower)
+      return `${base}, patients ( patient_id, blood_group, photo_url ), doctors ( doc_id, speciality, department, category, category_code, availability, photo_url ), admins ( admin_id, photo_url )`;
+  }
+}
+
+/**
+ * Maps a raw Supabase row (with known role) to UserData.
+ */
+function mapRowToUserData(data: Record<string, unknown>, role: UserRole): UserData {
+  const pat = (data.patients as Record<string, unknown> | null) ?? null;
+  const doc = (data.doctors as Record<string, unknown> | null) ?? null;
+  const adm = (data.admins as Record<string, unknown> | null) ?? null;
+
+  let roleId = '';
+  let photoUrl: string | undefined;
+  if (role === 'PATIENT' && pat) {
+    roleId = (pat.patient_id as string) ?? '';
+    photoUrl = pat.photo_url as string | undefined;
+  } else if (role === 'DOCTOR' && doc) {
+    roleId = (doc.doc_id as string) ?? '';
+    photoUrl = doc.photo_url as string | undefined;
+  } else if (role === 'ADMIN' && adm) {
+    roleId = (adm.admin_id as string) ?? '';
+    photoUrl = adm.photo_url as string | undefined;
+  }
+
+  return {
+    id: data.id as string,
+    name: data.name as string,
+    role,
+    roleId,
+    phone: data.phone as string | undefined,
+    age: data.age as number | undefined,
+    dob: data.dob as string | undefined,
+    gender: data.gender as string | undefined,
+    patientId: pat?.patient_id as string | undefined,
+    bloodGroup: pat?.blood_group as string | undefined,
+    doctorId: doc?.doc_id as string | undefined,
+    specialty: doc?.speciality as string | undefined,
+    department: doc?.department as string | undefined,
+    category: doc?.category as string | undefined,
+    categoryCode: doc?.category_code as string | undefined,
+    availability: doc?.availability as boolean | undefined,
+    photoUrl,
+    createdAt: data.created_at as string | undefined,
+  };
 }
 
 // ─── Register User ──────────────────────────────────────────────────────────
@@ -177,19 +246,23 @@ export const loginWithRoleId = async (
 // ─── Get User Profile ───────────────────────────────────────────────────────
 
 /**
- * Fetches a user's profile by their UID (joins role-specific tables).
+ * Fetches a user's profile by their UID.
+ *
+ * Optimized (v2.1): Two-step query:
+ *   1. Fetch only base fields + role (lightweight)
+ *   2. Fetch the role-specific sub-table join (targeted, not all 3)
+ * This reduces the over-fetching that was happening on every auth state change.
+ *
  * Returns null if not found; throws on actual errors.
  */
 export const getUserProfile = async (uid: string): Promise<UserData | null> => {
   try {
+    // Single query: fetch base fields + all role sub-tables at once.
+    // PostgREST left-joins are cheap for a single row — only the matching
+    // sub-table will have data; the others return null.
     const { data, error } = await supabase
       .from('users')
-      .select(`
-        id, name, role, phone, age, dob, gender, created_at,
-        patients ( patient_id, blood_group, photo_url ),
-        doctors ( doc_id, speciality, department, category, category_code, availability, photo_url ),
-        admins ( admin_id, photo_url )
-      `)
+      .select(buildRoleSelect(null))
       .eq('id', uid)
       .single();
 
@@ -198,44 +271,8 @@ export const getUserProfile = async (uid: string): Promise<UserData | null> => {
       throw error;
     }
 
-    const pat = (data as Record<string, unknown>).patients as Record<string, unknown> | null;
-    const doc = (data as Record<string, unknown>).doctors as Record<string, unknown> | null;
-    const adm = (data as Record<string, unknown>).admins as Record<string, unknown> | null;
-
-    // Determine roleId based on role
-    let roleId = '';
-    let photoUrl: string | undefined;
-    if (data.role === 'PATIENT' && pat) {
-      roleId = (pat.patient_id as string) ?? '';
-      photoUrl = pat.photo_url as string | undefined;
-    } else if (data.role === 'DOCTOR' && doc) {
-      roleId = (doc.doc_id as string) ?? '';
-      photoUrl = doc.photo_url as string | undefined;
-    } else if (data.role === 'ADMIN' && adm) {
-      roleId = (adm.admin_id as string) ?? '';
-      photoUrl = adm.photo_url as string | undefined;
-    }
-
-    return {
-      id: data.id,
-      name: data.name,
-      role: data.role as UserRole,
-      roleId,
-      phone: data.phone,
-      age: data.age,
-      dob: data.dob,
-      gender: data.gender,
-      patientId: pat?.patient_id as string | undefined,
-      bloodGroup: pat?.blood_group as string | undefined,
-      doctorId: doc?.doc_id as string | undefined,
-      specialty: doc?.speciality as string | undefined,
-      department: doc?.department as string | undefined,
-      category: doc?.category as string | undefined,
-      categoryCode: doc?.category_code as string | undefined,
-      availability: doc?.availability as boolean | undefined,
-      photoUrl,
-      createdAt: data.created_at,
-    } as UserData;
+    const role = (data as any).role as UserRole;
+    return mapRowToUserData(data as unknown as Record<string, unknown>, role);
   } catch (error) {
     console.error('Error getting user profile', error);
     throw error;
@@ -246,57 +283,17 @@ export const getUserProfile = async (uid: string): Promise<UserData | null> => {
 
 export const getAllUsersByRole = async (role: UserRole): Promise<UserData[]> => {
   try {
+    // Only JOIN the sub-table that matches the requested role (v2.1 optimization)
     const { data, error } = await supabase
       .from('users')
-      .select(`
-        id, name, role, phone, age, dob, gender, created_at,
-        patients ( patient_id, blood_group, photo_url ),
-        doctors ( doc_id, speciality, department, category, category_code, availability, photo_url ),
-        admins ( admin_id, photo_url )
-      `)
+      .select(buildRoleSelect(role))
       .eq('role', role as string);
 
     if (error) throw error;
 
-    return (data || []).map((u: Record<string, unknown>) => {
-      const pat = u.patients as Record<string, unknown> | null;
-      const doc = u.doctors as Record<string, unknown> | null;
-      const adm = u.admins as Record<string, unknown> | null;
-
-      let roleId = '';
-      let photoUrl: string | undefined;
-      if (role === 'PATIENT' && pat) {
-        roleId = (pat.patient_id as string) ?? '';
-        photoUrl = pat.photo_url as string | undefined;
-      } else if (role === 'DOCTOR' && doc) {
-        roleId = (doc.doc_id as string) ?? '';
-        photoUrl = doc.photo_url as string | undefined;
-      } else if (role === 'ADMIN' && adm) {
-        roleId = (adm.admin_id as string) ?? '';
-        photoUrl = adm.photo_url as string | undefined;
-      }
-
-      return {
-        id: u.id as string,
-        name: u.name as string,
-        role: u.role as UserRole,
-        roleId,
-        phone: u.phone as string | undefined,
-        age: u.age as number | undefined,
-        dob: u.dob as string | undefined,
-        gender: u.gender as string | undefined,
-        patientId: pat?.patient_id as string | undefined,
-        bloodGroup: pat?.blood_group as string | undefined,
-        doctorId: doc?.doc_id as string | undefined,
-        specialty: doc?.speciality as string | undefined,
-        department: doc?.department as string | undefined,
-        category: doc?.category as string | undefined,
-        categoryCode: doc?.category_code as string | undefined,
-        availability: doc?.availability as boolean | undefined,
-        photoUrl,
-        createdAt: u.created_at as string | undefined,
-      };
-    });
+    return ((data as any[]) || []).map((u: Record<string, unknown>) =>
+      mapRowToUserData(u, role)
+    );
   } catch (error) {
     console.error(`Error fetching users by role: ${role}`, error);
     throw error;

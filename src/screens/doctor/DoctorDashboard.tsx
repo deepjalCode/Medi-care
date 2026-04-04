@@ -85,9 +85,10 @@ export default function DoctorDashboard() {
     }
   }, [userId]);
 
-  // ── Realtime subscription ──────────────────────────────────────────────────
+  // ── Realtime subscription (smart state patching — no full re-fetch per event) ──
 
   useEffect(() => {
+    // Initial load
     fetchQueue();
 
     const channel = supabase
@@ -100,8 +101,44 @@ export default function DoctorDashboard() {
           table: 'appointments',
           filter: `doctor_id=eq.${userId}`,
         },
-        () => {
-          fetchQueue(); // Re-fetch on any change to this doctor's appointments
+        (payload) => {
+          const { eventType, new: newRow, old: oldRow } = payload as any;
+
+          if (eventType === 'INSERT' && newRow) {
+            // New appointment assigned — prepend to queue
+            const item: QueueItem = {
+              id: newRow.id,
+              patientId: newRow.patient_id ?? '',
+              patientName: 'New Patient', // Name requires a join; fetchQueue() on next refresh will correct it
+              token: newRow.token ?? 0,
+              tokenNumber: newRow.token_number ?? `#${newRow.token ?? 0}`,
+              reason: newRow.reason ?? '',
+              reasonForVisit: newRow.reason_for_visit ?? '',
+              status: newRow.status ?? 'WAITING',
+              generatedAt: newRow.generated_at ?? newRow.created_at ?? '',
+            };
+            // If patient name is missing, do a targeted fetch for just this one record
+            if (!newRow.patient_name) {
+              fetchQueue(); // one-time full fetch to get the joined name
+            } else {
+              setQueue((prev) => [item, ...prev]);
+            }
+          } else if (eventType === 'UPDATE' && newRow) {
+            // Status or field change — patch in place
+            const newStatus = newRow.status as QueueItem['status'];
+            if (newStatus === 'COMPLETED') {
+              // Remove completed items from the active queue
+              setQueue((prev) => prev.filter((q) => q.id !== newRow.id));
+            } else {
+              setQueue((prev) =>
+                prev.map((q) =>
+                  q.id === newRow.id ? { ...q, status: newStatus } : q,
+                ),
+              );
+            }
+          } else if (eventType === 'DELETE' && oldRow) {
+            setQueue((prev) => prev.filter((q) => q.id !== oldRow.id));
+          }
         },
       )
       .subscribe();
