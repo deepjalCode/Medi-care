@@ -1,0 +1,45 @@
+{
+  "data": [
+    {
+      "id": "3f3db190-598e-4c3b-9e29-1158a0fe43a5",
+      "speciality": "General Physician",
+      "availability": true,
+      "users": {
+        "name": "Aryan Mehta"
+      }
+    },
+    {
+      "id": "9665a2e6-4aa8-468b-a635-7073195319b7",
+      "speciality": "ENT",
+      "availability": true,
+      "users": {
+        "name": "Kavita Rao"
+      }
+    },
+    {
+      "id": "1a134544-69ba-497a-960c-ec6c001536cb",
+      "speciality": "Pediatrics",
+      "availability": true,
+      "users": {
+        "name": "Anjali Bose"
+      }
+    },
+    {
+      "id": "ffb74052-2ec6-42dd-89d1-de05694cfcdf",
+      "speciality": "Orthopedics",
+      "availability": true,
+      "users": {
+        "name": "Harish Reddy"
+      }
+    },
+    {
+      "id": "2bb2614b-2ac2-4133-a5fc-04e79244c4ee",
+      "speciality": "Dermatology",
+      "availability": true,
+      "users": {
+        "name": "Nisha Agarwal"
+      }
+    }
+  ],
+  "error": null
+}

@@ -339,7 +339,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingTop: 12,
+    paddingTop: 24, // Increased padding from top
     paddingBottom: 8,
   },
   logoContainer: { flexDirection: 'row', alignItems: 'center' },

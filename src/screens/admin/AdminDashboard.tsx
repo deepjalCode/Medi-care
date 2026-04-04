@@ -39,7 +39,8 @@ interface DoctorInfo {
   id: string;
   name: string;
   docId: string;
-  isActive: boolean;
+  specialty: string;
+  isAvailable: boolean;
 }
 
 interface QueueEntry {
@@ -110,8 +111,7 @@ export default function AdminDashboard() {
           supabase
             .from('appointments')
             .select('id', { count: 'exact', head: true })
-            .gte('created_at', `${todayDate}T00:00:00`)
-            .lte('created_at', `${todayDate}T23:59:59`),
+            .eq('visit_date', todayDate),
           supabase
             .from('appointments')
             .select(`
@@ -123,7 +123,7 @@ export default function AdminDashboard() {
             .order('token', { ascending: true }),
           supabase
             .from('doctors')
-            .select(`id, doc_id, users ( name )`),
+            .select(`id, doc_id, speciality, availability, users ( name )`),
           supabase
             .from('appointments')
             .select(`id, status, token, created_at, patients ( users ( name ) )`)
@@ -174,7 +174,8 @@ export default function AdminDashboard() {
         id: d.id,
         name: d.users?.name ?? 'Doctor',
         docId: d.doc_id ?? '',
-        isActive: activeDoctorIds.has(d.id),
+        specialty: d.speciality ?? 'General',
+        isAvailable: d.availability ?? false,
       }));
       setDoctors(mappedDoctors);
 
@@ -251,9 +252,8 @@ export default function AdminDashboard() {
     });
   };
 
-  // ─── Alert flags ───────────────────────────────────────────────────────────
   const highWaitAlert = avgWaitTime > 30;
-  const noDoctorAlert = doctors.length > 0 && doctors.every(d => !d.isActive);
+  const noDoctorAlert = doctors.length > 0 && doctors.every(d => !d.isAvailable);
   const largeQueueAlert = queueStatus.some(q => q.waitingCount > 10);
   const hasAlerts = highWaitAlert || noDoctorAlert || largeQueueAlert;
 
@@ -267,7 +267,7 @@ export default function AdminDashboard() {
       {/* ── Existing Header ───────────────────────────────────────────────── */}
       <View style={styles.header}>
         <Title style={styles.greeting}>Hello, {adminName} 👋</Title>
-        <Text style={styles.subtitle}>Here is the current OPD overview</Text>
+        <Text style={styles.subtitle}>Here is the current overview</Text>
       </View>
 
       {loading ? (
@@ -383,14 +383,33 @@ export default function AdminDashboard() {
                     <Icon
                       name="doctor"
                       size={28}
-                      color={doc.isActive ? '#2e7d32' : '#757575'}
+                      color={doc.isAvailable ? '#2e7d32' : '#9e9e9e'}
                     />
-                    <Text style={styles.doctorName} numberOfLines={1}>{doc.name}</Text>
-                    <Text style={styles.doctorDocId}>{doc.docId}</Text>
-                    <View style={[styles.doctorBadge, { backgroundColor: doc.isActive ? '#c8e6c9' : '#eeeeee' }]}>
-                      <View style={[styles.badgeDot, { backgroundColor: doc.isActive ? '#2e7d32' : '#9e9e9e' }]} />
-                      <Text style={[styles.doctorBadgeText, { color: doc.isActive ? '#2e7d32' : '#757575' }]}>
-                        {doc.isActive ? 'Active' : 'Offline'}
+                    <Text style={styles.doctorName} numberOfLines={1}>
+                      Dr. {doc.name}
+                    </Text>
+                    <Text style={styles.doctorSpecialty} numberOfLines={1}>
+                      {doc.specialty}
+                    </Text>
+                    <View
+                      style={[
+                        styles.doctorBadge,
+                        { backgroundColor: doc.isAvailable ? '#c8e6c9' : '#eeeeee' },
+                      ]}
+                    >
+                      <View
+                        style={[
+                          styles.badgeDot,
+                          { backgroundColor: doc.isAvailable ? '#2e7d32' : '#9e9e9e' },
+                        ]}
+                      />
+                      <Text
+                        style={[
+                          styles.doctorBadgeText,
+                          { color: doc.isAvailable ? '#2e7d32' : '#757575' },
+                        ]}
+                      >
+                        {doc.isAvailable ? 'Available' : 'Offline'}
                       </Text>
                     </View>
                   </Card.Content>
@@ -698,16 +717,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
   },
   doctorName: {
-    fontSize: 13,
+    fontSize: 12, // Matched with HomeScreen
     fontWeight: '600',
     color: '#212121',
     marginTop: 6,
     textAlign: 'center',
   },
-  doctorDocId: {
-    fontSize: 10,
-    color: '#9e9e9e',
+  doctorSpecialty: {
+    fontSize: 11,
+    color: '#757575',
     marginBottom: 6,
+    textAlign: 'center',
   },
   doctorBadge: {
     flexDirection: 'row',

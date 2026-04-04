@@ -119,11 +119,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 12,
-    paddingVertical: 10,
+    paddingHorizontal: 16, // slightly increased horizontal too
+    paddingVertical: 18, // Increased vertical padding
     borderBottomWidth: 1,
     elevation: 2,
-    height: 58,
+    height: 72, // Increased header height
   },
   left: {
     flexDirection: 'row',
