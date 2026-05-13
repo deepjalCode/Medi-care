@@ -16,11 +16,6 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   },
 });
 
-/**
- * Secondary client — no session persistence.
- * Use this when creating new user accounts from an admin context
- * so the current admin session is not overwritten.
- */
 export const secondarySupabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
     persistSession: false,

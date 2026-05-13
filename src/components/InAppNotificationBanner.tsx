@@ -11,10 +11,7 @@ interface Props {
 
 const BANNER_DURATION = 4000; // 4 seconds
 
-/**
- * A slide-down toast banner that appears at the top of the screen
- * when a new in-app notification arrives. Auto-dismisses after 4 seconds.
- */
+
 export default function InAppNotificationBanner({
   notification,
   onDismiss,
