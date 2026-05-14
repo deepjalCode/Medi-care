@@ -15,6 +15,7 @@ import { logout } from '../../store/slices/authSlice';
 import { supabase } from '../../services/supabaseSetup';
 import { createNotification } from '../../services/NotificationService';
 import { formatGeneratedAtCompact } from '../../utils/formatTokenDate';
+import { useNavigation } from '@react-navigation/native';
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
@@ -35,6 +36,7 @@ interface QueueItem {
 export default function DoctorDashboard() {
   const theme = useTheme();
   const dispatch = useDispatch();
+  const navigation = useNavigation<any>();
 
   const { userId, userName } = useSelector((state: RootState) => state.auth);
 
@@ -248,18 +250,36 @@ export default function DoctorDashboard() {
                       </Button>
                     )}
                     {appt.status === 'IN_PROGRESS' && (
-                      <Button
-                        mode="contained"
-                        buttonColor="#4caf50"
-                        onPress={() =>
-                          handleUpdateStatus(appt.id, appt.patientId, 'COMPLETED')
-                        }
-                        style={styles.actionBtn}
-                        loading={updating === appt.id}
-                        disabled={updating === appt.id}
-                      >
-                        Mark Done
-                      </Button>
+                      <>
+                        <Button
+                          mode="contained"
+                          buttonColor="#7c4dff"
+                          onPress={() =>
+                            navigation.navigate('AddPrescription', {
+                              patientId: appt.patientId,
+                              patientName: appt.patientName,
+                              appointmentId: appt.id,
+                              tokenNumber: appt.tokenNumber,
+                            })
+                          }
+                          style={styles.actionBtn}
+                          icon="pill"
+                        >
+                          Add Rx
+                        </Button>
+                        <Button
+                          mode="contained"
+                          buttonColor="#4caf50"
+                          onPress={() =>
+                            handleUpdateStatus(appt.id, appt.patientId, 'COMPLETED')
+                          }
+                          style={styles.actionBtn}
+                          loading={updating === appt.id}
+                          disabled={updating === appt.id}
+                        >
+                          Mark Done
+                        </Button>
+                      </>
                     )}
                   </View>
                 </Card.Content>

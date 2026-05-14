@@ -8,12 +8,21 @@ import {
   Text,
   useTheme,
   ActivityIndicator,
+  Modal,
+  Portal,
+  Divider,
 } from 'react-native-paper';
+import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '../../store';
 import { logout } from '../../store/slices/authSlice';
 import { supabase } from '../../services/supabaseSetup';
 import { formatGeneratedAt } from '../../utils/formatTokenDate';
+import {
+  getPrescriptionsByAppointment,
+  PrescriptionData,
+  MedicationItem,
+} from '../../services/prescriptionService';
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
@@ -41,6 +50,12 @@ export default function PatientDashboard() {
   const [tokens, setTokens] = useState<TokenItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+
+  // Prescription modal state
+  const [rxModalVisible, setRxModalVisible] = useState(false);
+  const [rxLoading, setRxLoading] = useState(false);
+  const [selectedRx, setSelectedRx] = useState<PrescriptionData | null>(null);
+  const [selectedDoctorName, setSelectedDoctorName] = useState('');
 
   // ── Fetch tokens from Supabase ─────────────────────────────────────────────
 
@@ -146,9 +161,38 @@ export default function PatientDashboard() {
     fetchTokens();
   };
 
+  // ── View Prescription handler ─────────────────────────────────────────────
+
+  const handleViewPrescription = async (appointmentId: string, doctorName: string) => {
+    setSelectedDoctorName(doctorName);
+    setRxModalVisible(true);
+    setRxLoading(true);
+    setSelectedRx(null);
+    try {
+      const prescriptions = await getPrescriptionsByAppointment(appointmentId);
+      setSelectedRx(prescriptions.length > 0 ? prescriptions[0] : null);
+    } catch (err) {
+      console.error('PatientDashboard: fetch prescription failed', err);
+    } finally {
+      setRxLoading(false);
+    }
+  };
+
+  const formatRxDate = (isoString?: string): string => {
+    if (!isoString) return '';
+    try {
+      return new Date(isoString).toLocaleDateString('en-IN', {
+        day: '2-digit', month: 'short', year: 'numeric',
+      });
+    } catch {
+      return isoString;
+    }
+  };
+
   // ── Render ─────────────────────────────────────────────────────────────────
 
   return (
+    <>
     <ScrollView
       style={[styles.container, { backgroundColor: theme.colors.background }]}
       refreshControl={
@@ -197,6 +241,20 @@ export default function PatientDashboard() {
                       </Text>
                     </View>
                   </View>
+
+                  {/* View Prescription button — visible for COMPLETED visits */}
+                  {token.status === 'COMPLETED' && (
+                    <Button
+                      mode="outlined"
+                      onPress={() => handleViewPrescription(token.id, token.doctorName)}
+                      style={styles.rxButton}
+                      icon="pill"
+                      textColor="#7c4dff"
+                      compact
+                    >
+                      View Prescription
+                    </Button>
+                  )}
                 </Card.Content>
               </Card>
             ))
@@ -213,6 +271,81 @@ export default function PatientDashboard() {
         </View>
       )}
     </ScrollView>
+
+    {/* ── Prescription Detail Modal ──────────────────────────────────────── */}
+    <Portal>
+      <Modal
+        visible={rxModalVisible}
+        onDismiss={() => setRxModalVisible(false)}
+        contentContainerStyle={styles.rxModal}
+      >
+        <ScrollView showsVerticalScrollIndicator={false}>
+          <View style={styles.rxModalHeader}>
+            <Icon name="pill" size={28} color="#7c4dff" />
+            <Title style={styles.rxModalTitle}>Prescription</Title>
+          </View>
+          <Text style={styles.rxModalDoctor}>{selectedDoctorName}</Text>
+
+          <Divider style={styles.rxDivider} />
+
+          {rxLoading ? (
+            <ActivityIndicator animating style={{ marginVertical: 30 }} />
+          ) : selectedRx ? (
+            <>
+              {/* Diagnosis */}
+              {selectedRx.diagnosis ? (
+                <View style={styles.rxDiagnosisBox}>
+                  <Icon name="clipboard-text" size={16} color="#e65100" style={{ marginRight: 6 }} />
+                  <Text style={styles.rxDiagnosisText}>{selectedRx.diagnosis}</Text>
+                </View>
+              ) : null}
+
+              {/* Medications */}
+              <Text style={styles.rxSectionLabel}>
+                <Icon name="pill" size={14} color="#2e7d32" />  Medications
+              </Text>
+              {selectedRx.medications.map((med: MedicationItem, idx: number) => (
+                <View key={idx} style={styles.rxMedItem}>
+                  <Text style={styles.rxMedName}>{idx + 1}. {med.name}</Text>
+                  <Text style={styles.rxMedDetails}>
+                    {med.dosage} · {med.frequency} · {med.duration}
+                  </Text>
+                </View>
+              ))}
+
+              {/* Doctor's Notes */}
+              {selectedRx.doctorNotes ? (
+                <>
+                  <Divider style={styles.rxDivider} />
+                  <View style={styles.rxNotesBox}>
+                    <Icon name="note-text" size={16} color="#5e35b1" style={{ marginRight: 6 }} />
+                    <Text style={styles.rxNotesText}>{selectedRx.doctorNotes}</Text>
+                  </View>
+                </>
+              ) : null}
+
+              {selectedRx.createdAt ? (
+                <Text style={styles.rxDate}>Prescribed on {formatRxDate(selectedRx.createdAt)}</Text>
+              ) : null}
+            </>
+          ) : (
+            <View style={styles.rxEmptyState}>
+              <Icon name="pill-off" size={40} color="#ccc" />
+              <Text style={styles.rxEmptyText}>No prescription found for this visit.</Text>
+            </View>
+          )}
+
+          <Button
+            mode="contained"
+            onPress={() => setRxModalVisible(false)}
+            style={styles.rxCloseBtn}
+          >
+            Close
+          </Button>
+        </ScrollView>
+      </Modal>
+    </Portal>
+  </>
   );
 }
 
@@ -274,6 +407,11 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: 'bold',
   },
+  rxButton: {
+    marginTop: 12,
+    borderColor: '#7c4dff',
+    alignSelf: 'flex-start',
+  },
   emptyState: {
     padding: 32,
     alignItems: 'center',
@@ -290,5 +428,97 @@ const styles = StyleSheet.create({
     color: '#888',
     fontStyle: 'italic',
     textAlign: 'center',
+  },
+  // ── Prescription Modal Styles ────────────────────────────────────────────
+  rxModal: {
+    margin: 20,
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 20,
+    maxHeight: '80%',
+  },
+  rxModalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  rxModalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginLeft: 8,
+  },
+  rxModalDoctor: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 4,
+  },
+  rxDivider: {
+    marginVertical: 12,
+  },
+  rxDiagnosisBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff3e0',
+    padding: 10,
+    borderRadius: 8,
+    marginBottom: 12,
+  },
+  rxDiagnosisText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#e65100',
+    flex: 1,
+  },
+  rxSectionLabel: {
+    fontSize: 13,
+    fontWeight: 'bold',
+    color: '#2e7d32',
+    marginBottom: 8,
+  },
+  rxMedItem: {
+    marginBottom: 8,
+    paddingLeft: 8,
+  },
+  rxMedName: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#212121',
+  },
+  rxMedDetails: {
+    fontSize: 13,
+    color: '#666',
+    marginTop: 2,
+    paddingLeft: 16,
+  },
+  rxNotesBox: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: '#ede7f6',
+    padding: 10,
+    borderRadius: 8,
+  },
+  rxNotesText: {
+    fontSize: 13,
+    color: '#4527a0',
+    flex: 1,
+    fontStyle: 'italic',
+  },
+  rxDate: {
+    fontSize: 11,
+    color: '#999',
+    textAlign: 'right',
+    marginTop: 12,
+  },
+  rxEmptyState: {
+    alignItems: 'center',
+    paddingVertical: 30,
+  },
+  rxEmptyText: {
+    color: '#888',
+    marginTop: 8,
+    fontStyle: 'italic',
+  },
+  rxCloseBtn: {
+    marginTop: 16,
   },
 });

@@ -1,43 +1,55 @@
 /**
- * DoctorNavigator (v2.0)
+ * DoctorNavigator (v3.0)
  *
- * Changes:
- * - Imports useNotificationContext to get unreadCount
- * - Passes showNotificationBell, unreadCount, onNotificationPress to AppHeader
- * - Adds NotificationScreen modal triggered by bell tap
+ * Changes from v2.0:
+ * - Wraps bottom tabs in a NativeStackNavigator so AddPrescriptionScreen
+ *   can be pushed as a full-screen stack route from DoctorDashboard.
+ * - Existing notification bell + profile panel logic unchanged.
  */
 
 import React, { useState } from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import DoctorDashboard from '../screens/doctor/DoctorDashboard';
 import PatientSearchScreen from '../screens/doctor/PatientSearchScreen';
+import AddPrescriptionScreen from '../screens/doctor/AddPrescriptionScreen';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import AppHeader from '../components/AppHeader';
 import ProfilePanel from '../components/ProfilePanel';
-// --- ADDED: Notification context + screen (Feature 2 & 3) ---
 import { useNotificationContext } from '../context/NotificationContext';
 import NotificationScreen from '../screens/NotificationScreen';
-// --- END ADDED ---
+
+// ─── Param lists ────────────────────────────────────────────────────────────────
 
 export type DoctorTabParamList = {
   Dashboard: undefined;
   SearchPatient: undefined;
 };
 
+export type DoctorStackParamList = {
+  DoctorTabs: undefined;
+  AddPrescription: {
+    patientId: string;
+    patientName: string;
+    appointmentId?: string;
+    tokenNumber?: string;
+  };
+};
+
 const Tab = createBottomTabNavigator<DoctorTabParamList>();
+const Stack = createNativeStackNavigator<DoctorStackParamList>();
 
 const TITLES: Record<string, string> = {
   Dashboard: 'Patient Queue',
   SearchPatient: 'Search Patient',
 };
 
-export default function DoctorNavigator() {
-  const [profileVisible, setProfileVisible] = useState(false);
+// ─── Tabs (inner) ───────────────────────────────────────────────────────────────
 
-  // --- ADDED: Notification bell state (Feature 2 & 3) ---
+function DoctorTabs() {
+  const [profileVisible, setProfileVisible] = useState(false);
   const [notifVisible, setNotifVisible] = useState(false);
   const { unreadCount } = useNotificationContext();
-  // --- END ADDED ---
 
   return (
     <>
@@ -53,11 +65,9 @@ export default function DoctorNavigator() {
             <AppHeader
               title={TITLES[route.name] ?? route.name}
               onProfilePress={() => setProfileVisible(true)}
-              // --- ADDED: Notification bell props (Feature 3) ---
               showNotificationBell={true}
               unreadCount={unreadCount}
               onNotificationPress={() => setNotifVisible(true)}
-              // --- END ADDED ---
             />
           ),
         })}
@@ -71,12 +81,29 @@ export default function DoctorNavigator() {
         onDismiss={() => setProfileVisible(false)}
       />
 
-      {/* --- ADDED: Notification modal (Feature 2 & 3) --- */}
       <NotificationScreen
         visible={notifVisible}
         onClose={() => setNotifVisible(false)}
       />
-      {/* --- END ADDED --- */}
     </>
+  );
+}
+
+// ─── Stack (outer) ──────────────────────────────────────────────────────────────
+
+export default function DoctorNavigator() {
+  return (
+    <Stack.Navigator screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="DoctorTabs" component={DoctorTabs} />
+      <Stack.Screen
+        name="AddPrescription"
+        component={AddPrescriptionScreen}
+        options={{
+          headerShown: true,
+          title: 'Add Prescription',
+          headerBackTitle: 'Back',
+        }}
+      />
+    </Stack.Navigator>
   );
 }
