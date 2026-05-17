@@ -124,7 +124,7 @@ export default function HomeScreen() {
         {/* ── Hero ──────────────────────────────────────────────────────── */}
         <Card style={styles.heroCard} mode="elevated">
           <Card.Content>
-            <Title style={styles.heroTitle}>Welcome to OPD System</Title>
+            <Title style={styles.heroTitle}>Welcome to Medicare</Title>
             <Text style={styles.heroText}>
               Your centralized digital healthcare partner. Quick registration,
               easy appointments, and seamless token management.
