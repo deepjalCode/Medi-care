@@ -124,10 +124,9 @@ export default function HomeScreen() {
         {/* ── Hero ──────────────────────────────────────────────────────── */}
         <Card style={styles.heroCard} mode="elevated">
           <Card.Content>
-            <Title style={styles.heroTitle}>Welcome to Medicare</Title>
+            <Title style={styles.heroTitle}>Welcome</Title>
             <Text style={styles.heroText}>
-              Your centralized digital healthcare partner. Quick registration,
-              easy appointments, and seamless token management.
+              Medicare is a healthcare management software designed to streamline and simplify hospital and clinic operations through a centralized digital platform. The system enables efficient management of patients, doctors, appointments, OPD token queues, and administrative activities. It provides role-based access for Admins, Doctors, and Patients, ensuring secure and organized healthcare workflows.
             </Text>
           </Card.Content>
         </Card>
