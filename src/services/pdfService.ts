@@ -1,5 +1,5 @@
 /**
- * PDF Service (v1.0)
+ * PDF Service (v1.1)
  *
  * Generates PDF documents on-device from HTML templates.
  * Uses react-native-html-to-pdf for generation and
@@ -58,102 +58,102 @@ export interface AdminReportData {
 // ─── Shared Styles ─────────────────────────────────────────────────────────────
 
 const BASE_STYLES = `
-  <style>
-    * { margin: 0; padding: 0; box- sizing: border-box; }
-    body {
-  font - family: 'Helvetica Neue', Helvetica, Arial, sans - serif;
-  color: #212121;
-  padding: 24px;
-  font - size: 12px;
-  line - height: 1.5;
-}
-    .header {
-  text - align: center;
-  border - bottom: 2px solid #a2d2ff;
-  padding - bottom: 12px;
-  margin - bottom: 20px;
-}
-    .header h1 {
-  font - size: 22px;
-  color: #002a4d;
-  margin - bottom: 4px;
-}
-    .header p {
-  color: #666;
-  font - size: 11px;
-}
-    .section - title {
-  font - size: 14px;
-  font - weight: bold;
-  color: #002a4d;
-  margin - top: 20px;
-  margin - bottom: 8px;
-  border - left: 4px solid #a2d2ff;
-  padding - left: 8px;
-}
-    table {
-  width: 100 %;
-  border - collapse: collapse;
-  margin - bottom: 16px;
-}
-th, td {
-  border: 1px solid #e0e0e0;
-  padding: 6px 8px;
-  text - align: left;
-  font - size: 11px;
-}
-    th {
-  background - color: #f5f9ff;
-  font - weight: 600;
-  color: #002a4d;
-}
-tr: nth - child(even) { background - color: #fafafa; }
-    .info - row {
-  display: flex;
-  justify - content: space - between;
-  margin - bottom: 6px;
-}
-    .info - label { color: #666; font - weight: 600; }
-    .info - value { color: #212121; }
-    .badge {
-  display: inline - block;
-  padding: 2px 8px;
-  border - radius: 12px;
-  font - size: 10px;
-  font - weight: 600;
-}
-    .badge - completed { background: #c8e6c9; color: #2e7d32; }
-    .badge - waiting { background: #fff9c4; color: #f57f17; }
-    .badge -in -progress { background: #e3f2fd; color: #1565c0; }
-    .badge - cancelled { background: #ffcdd2; color: #c62828; }
-    .footer {
-  margin - top: 24px;
-  text - align: center;
-  font - size: 10px;
-  color: #9e9e9e;
-  border - top: 1px solid #e0e0e0;
-  padding - top: 8px;
-}
-    .med - list { margin - left: 16px; margin - bottom: 8px; }
-    .med - item { margin - bottom: 4px; }
-    .med - name { font - weight: 600; }
-    .med - details { color: #666; font - size: 11px; }
-    .diagnosis - box {
-  background: #fff3e0;
-  border - radius: 6px;
-  padding: 8px 12px;
-  margin - bottom: 12px;
-}
-    .notes - box {
-  background: #ede7f6;
-  border - radius: 6px;
-  padding: 8px 12px;
-  margin - bottom: 12px;
-  font - style: italic;
-  color: #4527a0;
-}
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+    color: #212121;
+    padding: 24px;
+    font-size: 12px;
+    line-height: 1.5;
+  }
+  .header {
+    text-align: center;
+    border-bottom: 2px solid #a2d2ff;
+    padding-bottom: 12px;
+    margin-bottom: 20px;
+  }
+  .header h1 {
+    font-size: 22px;
+    color: #002a4d;
+    margin-bottom: 4px;
+  }
+  .header p {
+    color: #666;
+    font-size: 11px;
+  }
+  .section-title {
+    font-size: 14px;
+    font-weight: bold;
+    color: #002a4d;
+    margin-top: 20px;
+    margin-bottom: 8px;
+    border-left: 4px solid #a2d2ff;
+    padding-left: 8px;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 16px;
+  }
+  th, td {
+    border: 1px solid #e0e0e0;
+    padding: 6px 8px;
+    text-align: left;
+    font-size: 11px;
+  }
+  th {
+    background-color: #f5f9ff;
+    font-weight: 600;
+    color: #002a4d;
+  }
+  tr:nth-child(even) { background-color: #fafafa; }
+  .info-row {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 6px;
+  }
+  .info-label { color: #666; font-weight: 600; }
+  .info-value { color: #212121; }
+  .badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 10px;
+    font-weight: 600;
+  }
+  .badge-completed { background: #c8e6c9; color: #2e7d32; }
+  .badge-waiting { background: #fff9c4; color: #f57f17; }
+  .badge-in-progress { background: #e3f2fd; color: #1565c0; }
+  .badge-cancelled { background: #ffcdd2; color: #c62828; }
+  .footer {
+    margin-top: 24px;
+    text-align: center;
+    font-size: 10px;
+    color: #9e9e9e;
+    border-top: 1px solid #e0e0e0;
+    padding-top: 8px;
+  }
+  .med-list { margin-left: 16px; margin-bottom: 8px; }
+  .med-item { margin-bottom: 4px; }
+  .med-name { font-weight: 600; }
+  .med-details { color: #666; font-size: 11px; }
+  .diagnosis-box {
+    background: #fff3e0;
+    border-radius: 6px;
+    padding: 8px 12px;
+    margin-bottom: 12px;
+  }
+  .notes-box {
+    background: #ede7f6;
+    border-radius: 6px;
+    padding: 8px 12px;
+    margin-bottom: 12px;
+    font-style: italic;
+    color: #4527a0;
+  }
 </style>
-  `;
+`;
 
 // ─── Prescription PDF ──────────────────────────────────────────────────────────
 
@@ -167,63 +167,63 @@ export async function generatePrescriptionPdf(
   const medsHtml = rx.medications
     .map(
       (med: MedicationItem, idx: number) => `
-  < div class="med-item" >
-    <span class="med-name" > ${idx + 1}. ${escapeHtml(med.name)} </span><br/ >
-      <span class="med-details" > ${escapeHtml(med.dosage)} · ${escapeHtml(med.frequency)} · ${escapeHtml(med.duration)} </span>
+        <div class="med-item">
+          <span class="med-name">${idx + 1}. ${escapeHtml(med.name)}</span><br/>
+          <span class="med-details">${escapeHtml(med.dosage)} &middot; ${escapeHtml(med.frequency)} &middot; ${escapeHtml(med.duration)}</span>
         </div>
-          `,
+      `,
     )
     .join('');
 
   const dateStr = rx.createdAt
     ? new Date(rx.createdAt).toLocaleDateString('en-IN', {
-      day: '2-digit',
-      month: 'short',
-      year: 'numeric',
-    })
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+      })
     : 'N/A';
 
-  const html = `
-        < html >
-        <head>${BASE_STYLES} </head>
-          < body >
-          <div class="header" >
-            <h1>🏥 Medi Care </h1>
-              < p > Prescription </p>
-              </div>
+  const html = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  ${BASE_STYLES}
+</head>
+<body>
+  <div class="header">
+    <h1>Medi Care</h1>
+    <p>Prescription</p>
+  </div>
 
-              < div class="info-row" >
-                <span><span class="info-label" > Doctor: </span> <span class="info-value">${escapeHtml(rx.doctorName ?? 'Doctor')}</span > </span>
-                  < span > <span class="info-label" > Date: </span> <span class="info-value">${dateStr}</span > </span>
-                    </div>
+  <div class="info-row">
+    <span><span class="info-label">Doctor: </span><span class="info-value">${escapeHtml(rx.doctorName ?? 'Doctor')}</span></span>
+    <span><span class="info-label">Date: </span><span class="info-value">${dateStr}</span></span>
+  </div>
 
-      ${rx.diagnosis ? `
-        <div class="section-title">Diagnosis</div>
-        <div class="diagnosis-box">${escapeHtml(rx.diagnosis)}</div>
-      ` : ''
-    }
+  ${rx.diagnosis ? `
+    <div class="section-title">Clinical Assessment</div>
+    <div class="diagnosis-box">${escapeHtml(rx.diagnosis)}</div>
+  ` : ''}
 
-<div class="section-title" > Medications </div>
-  < div class="med-list" >
+  <div class="section-title">Medicine Prescribed</div>
+  <div class="med-list">
     ${medsHtml || '<p style="color:#888;">No medications listed.</p>'}
-</div>
+  </div>
 
-      ${rx.doctorNotes ? `
-        <div class="section-title">Doctor's Notes</div>
-        <div class="notes-box">${escapeHtml(rx.doctorNotes)}</div>
-      ` : ''
-    }
+  ${rx.doctorNotes ? `
+    <div class="section-title">Doctor\'s Notes</div>
+    <div class="notes-box">${escapeHtml(rx.doctorNotes)}</div>
+  ` : ''}
 
-<div class="footer" >
-  Generated by Medi Care App · ${new Date().toLocaleString('en-IN')}
-</div>
-  </body>
-  </html>
-    `;
+  <div class="footer">
+    Generated by Medi Care App &middot; ${new Date().toLocaleString('en-IN')}
+  </div>
+</body>
+</html>`;
 
   const options: any = {
     html,
-    fileName: `prescription_${(rx.id ?? '').trim()}`,
+    fileName: `prescription_${(rx.id ?? '').trim() || Date.now()}`,
   };
   if (Platform.OS === 'ios') {
     options.directory = 'Documents';
@@ -309,73 +309,71 @@ export async function generateReportPdf(
     .filter(Boolean)
     .join(' · ');
 
-  const html = `
-    <html>
-    <head>${BASE_STYLES}</head>
-    <body>
-      <div class="header">
-        <h1>🏥 Medi Care — Admin Report</h1>
-        <p>${filterDesc}</p>
-      </div>
+  const html = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  ${BASE_STYLES}
+</head>
+<body>
+  <div class="header">
+    <h1>Medi Care &mdash; Admin Report</h1>
+    <p>${filterDesc}</p>
+  </div>
 
-      <div class="section-title">Doctor-Wise Summary</div>
-      ${summary.length > 0
-      ? `
-        <table>
-          <thead>
-            <tr>
-              <th>Doctor</th>
-              <th>Specialty</th>
-              <th>Dept</th>
-              <th>Total</th>
-              <th>Seen</th>
-              <th>Cancelled</th>
-              <th>Unique Patients</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${summaryRows}
-            <tr style="font-weight:bold; background:#e3f2fd;">
-              <td colspan="3">TOTAL</td>
-              <td style="text-align:center">${totalAppts}</td>
-              <td style="text-align:center">${totalCompleted}</td>
-              <td style="text-align:center">${totalCancelled}</td>
-              <td style="text-align:center">${totalUnique}</td>
-            </tr>
-          </tbody>
-        </table>
-      `
-      : '<p style="color:#888;">No doctor data available for this range.</p>'
-    }
+  <div class="section-title">Doctor-Wise Summary</div>
+  ${summary.length > 0
+    ? `<table>
+        <thead>
+          <tr>
+            <th>Doctor</th>
+            <th>Specialty</th>
+            <th>Dept</th>
+            <th>Total</th>
+            <th>Seen</th>
+            <th>Cancelled</th>
+            <th>Unique Patients</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${summaryRows}
+          <tr style="font-weight:bold; background:#e3f2fd;">
+            <td colspan="3">TOTAL</td>
+            <td style="text-align:center">${totalAppts}</td>
+            <td style="text-align:center">${totalCompleted}</td>
+            <td style="text-align:center">${totalCancelled}</td>
+            <td style="text-align:center">${totalUnique}</td>
+          </tr>
+        </tbody>
+      </table>`
+    : '<p style="color:#888;">No doctor data available for this range.</p>'
+  }
 
-      <div class="section-title">Patient Visit Details (${visits.length} records)</div>
-      ${visits.length > 0
-      ? `
-        <table>
-          <thead>
-            <tr>
-              <th>Token</th>
-              <th>Patient</th>
-              <th>Patient ID</th>
-              <th>Doctor</th>
-              <th>Visit Date</th>
-              <th>Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${visitRows}
-          </tbody>
-        </table>
-      `
-      : '<p style="color:#888;">No visit records found for this range.</p>'
-    }
+  <div class="section-title">Patient Visit Details (${visits.length} records)</div>
+  ${visits.length > 0
+    ? `<table>
+        <thead>
+          <tr>
+            <th>Token</th>
+            <th>Patient</th>
+            <th>Patient ID</th>
+            <th>Doctor</th>
+            <th>Visit Date</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${visitRows}
+        </tbody>
+      </table>`
+    : '<p style="color:#888;">No visit records found for this range.</p>'
+  }
 
-      <div class="footer">
-        Report generated at ${generated_at ? new Date(generated_at).toLocaleString('en-IN') : new Date().toLocaleString('en-IN')} · Medi Care App
-      </div>
-    </body>
-    </html>
-  `;
+  <div class="footer">
+    Report generated at ${generated_at ? new Date(generated_at).toLocaleString('en-IN') : new Date().toLocaleString('en-IN')} &middot; Medi Care App
+  </div>
+</body>
+</html>`;
 
   const options: any = {
     html,
@@ -410,7 +408,7 @@ export async function generateReportPdf(
 // ─── Helper ────────────────────────────────────────────────────────────────────
 
 function escapeHtml(text: string): string {
-  return text
+  return (text ?? '')
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')

@@ -185,7 +185,7 @@ export default function PrescriptionsScreen() {
 
                   {/* Medications */}
                   <Text style={styles.medsLabel}>
-                    <Icon name="pill" size={14} color="#2e7d32" /> Medications
+                    <Icon name="pill" size={14} color="#2e7d32" /> Medicine Prescribed
                   </Text>
                   {rx.medications.map((med: MedicationItem, idx: number) => (
                     <View key={idx} style={styles.medItem}>

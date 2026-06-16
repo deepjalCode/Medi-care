@@ -11,7 +11,7 @@
  * - "Download PDF" button that generates and shares a PDF
  */
 
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import {
   View,
   StyleSheet,
@@ -29,7 +29,7 @@ import {
   Divider,
   Menu,
 } from 'react-native-paper';
-import DateTimePicker from '@react-native-community/datetimepicker';
+import DateTimePicker, { DateTimePickerAndroid } from '@react-native-community/datetimepicker';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import {
   fetchAdminReport,
@@ -86,11 +86,66 @@ export default function AdminReportScreen() {
   const [startDate, setStartDate] = useState(() => {
     const d = new Date();
     d.setDate(d.getDate() - 7); // Default: last 7 days
+    d.setHours(0, 0, 0, 0);    // Normalize to midnight
     return d;
   });
-  const [endDate, setEndDate] = useState(new Date());
+  const [endDate, setEndDate] = useState(() => {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);    // Normalize to midnight
+    return d;
+  });
   const [showStartPicker, setShowStartPicker] = useState(false);
   const [showEndPicker, setShowEndPicker] = useState(false);
+
+  // Keep refs up-to-date so DateTimePickerAndroid callbacks always see latest values
+  const startDateRef = useRef(startDate);
+  const endDateRef = useRef(endDate);
+  useEffect(() => { startDateRef.current = startDate; }, [startDate]);
+  useEffect(() => { endDateRef.current = endDate; }, [endDate]);
+
+  // ── Android imperative picker openers ─────────────────────────────────────
+
+  const openStartDatePicker = () => {
+    if (Platform.OS === 'android') {
+      DateTimePickerAndroid.open({
+        value: startDateRef.current,
+        mode: 'date',
+        minimumDate: new Date(2000, 0, 1),
+        maximumDate: endDateRef.current,
+        onChange: (_event, selected) => {
+          if (selected) {
+            const d = new Date(selected);
+            d.setHours(0, 0, 0, 0);
+            setStartDate(d);
+          }
+        },
+      });
+    } else {
+      setShowStartPicker(prev => !prev);
+      setShowEndPicker(false);
+    }
+  };
+
+  const openEndDatePicker = () => {
+    if (Platform.OS === 'android') {
+      DateTimePickerAndroid.open({
+        value: endDateRef.current,
+        mode: 'date',
+        minimumDate: startDateRef.current,
+        maximumDate: new Date(),
+        onChange: (_event, selected) => {
+          if (selected) {
+            const d = new Date(selected);
+            d.setHours(0, 0, 0, 0);
+            setEndDate(d);
+          }
+        },
+      });
+    } else {
+      setShowEndPicker(prev => !prev);
+      setShowStartPicker(false);
+    }
+  };
 
   const [selectedDoctorId, setSelectedDoctorId] = useState<string | undefined>(undefined);
   const [selectedDoctorName, setSelectedDoctorName] = useState('All Doctors');
@@ -190,7 +245,7 @@ export default function AdminReportScreen() {
           <View style={styles.dateRow}>
             <Button
               mode="outlined"
-              onPress={() => setShowStartPicker(true)}
+              onPress={openStartDatePicker}
               icon="calendar"
               style={styles.dateBtn}
               compact
@@ -200,7 +255,7 @@ export default function AdminReportScreen() {
             <Text style={styles.dateSep}>→</Text>
             <Button
               mode="outlined"
-              onPress={() => setShowEndPicker(true)}
+              onPress={openEndDatePicker}
               icon="calendar"
               style={styles.dateBtn}
               compact
@@ -209,28 +264,38 @@ export default function AdminReportScreen() {
             </Button>
           </View>
 
-          {showStartPicker && (
+          {/* iOS-only inline pickers */}
+          {Platform.OS === 'ios' && showStartPicker && (
             <DateTimePicker
               value={startDate}
               mode="date"
-              display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+              display="spinner"
+              minimumDate={new Date(2000, 0, 1)}
               maximumDate={endDate}
-              onChange={(_, selected) => {
+              onChange={(event, selected) => {
                 setShowStartPicker(false);
-                if (selected) setStartDate(selected);
+                if (event.type === 'set' && selected) {
+                  const d = new Date(selected);
+                  d.setHours(0, 0, 0, 0);
+                  setStartDate(d);
+                }
               }}
             />
           )}
-          {showEndPicker && (
+          {Platform.OS === 'ios' && showEndPicker && (
             <DateTimePicker
               value={endDate}
               mode="date"
-              display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+              display="spinner"
               minimumDate={startDate}
               maximumDate={new Date()}
-              onChange={(_, selected) => {
+              onChange={(event, selected) => {
                 setShowEndPicker(false);
-                if (selected) setEndDate(selected);
+                if (event.type === 'set' && selected) {
+                  const d = new Date(selected);
+                  d.setHours(0, 0, 0, 0);
+                  setEndDate(d);
+                }
               }}
             />
           )}

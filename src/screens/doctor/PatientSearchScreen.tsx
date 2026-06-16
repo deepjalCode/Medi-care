@@ -10,29 +10,81 @@ import {
   Text,
   ActivityIndicator,
 } from 'react-native-paper';
-import { getAllUsersByRole, UserData } from '../../services/userService';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
+import { useSelector } from 'react-redux';
+import { RootState } from '../../store';
+import { supabase } from '../../services/supabaseSetup';
+
+// ─── Types ──────────────────────────────────────────────────────────────────────
+
+interface PatientItem {
+  id: string;
+  name: string;
+  phone?: string;
+  age?: number;
+  bloodGroup?: string;
+  patientId?: string;
+}
+
+// ─── Component ──────────────────────────────────────────────────────────────────
 
 export default function PatientSearchScreen() {
   const [searchQuery, setSearchQuery] = useState('');
-  const [patients, setPatients] = useState<UserData[]>([]);
-  const [filteredPatients, setFilteredPatients] = useState<UserData[]>([]);
+  const [patients, setPatients] = useState<PatientItem[]>([]);
+  const [filteredPatients, setFilteredPatients] = useState<PatientItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const theme = useTheme();
   const navigation = useNavigation<any>();
+  const { userId } = useSelector((state: RootState) => state.auth);
 
+  // Fetch ONLY patients who have had an appointment with THIS doctor
   const fetchPatients = async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true);
     else setLoading(true);
     try {
-      const data = await getAllUsersByRole('PATIENT');
-      setPatients(data);
-      setFilteredPatients(data);
+      const { data, error } = await supabase
+        .from('appointments')
+        .select(`
+          patient_id,
+          patients (
+            id,
+            patient_id,
+            blood_group,
+            users ( id, name, phone, age )
+          )
+        `)
+        .eq('doctor_id', userId)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      // Deduplicate: a patient can have multiple appointments with same doctor
+      const seen = new Set<string>();
+      const mapped: PatientItem[] = [];
+
+      for (const row of (data ?? []) as any[]) {
+        const pat = row.patients as any;
+        const usr = pat?.users as any;
+        const uid: string = usr?.id ?? pat?.id ?? '';
+        if (!uid || seen.has(uid)) continue;
+        seen.add(uid);
+        mapped.push({
+          id: uid,
+          name: usr?.name ?? 'Unknown',
+          phone: usr?.phone ?? undefined,
+          age: usr?.age ?? undefined,
+          bloodGroup: pat?.blood_group ?? undefined,
+          patientId: pat?.patient_id ?? undefined,
+        });
+      }
+
+      setPatients(mapped);
+      setFilteredPatients(mapped);
       setSearchQuery('');
-    } catch (error) {
-      console.error('Failed to fetch patients', error);
+    } catch (err) {
+      console.error('PatientSearchScreen: fetch failed', err);
       Alert.alert('Error', 'Could not load patient records. Please try again.');
     } finally {
       setLoading(false);
@@ -44,7 +96,8 @@ export default function PatientSearchScreen() {
   useFocusEffect(
     useCallback(() => {
       fetchPatients();
-    }, []),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [userId]),
   );
 
   const handleSearch = (query: string) => {
@@ -63,7 +116,7 @@ export default function PatientSearchScreen() {
     setFilteredPatients(filtered);
   };
 
-  const renderItem = ({ item }: { item: UserData }) => (
+  const renderItem = ({ item }: { item: PatientItem }) => (
     <Card style={styles.card} mode="elevated">
       <Card.Content>
         <View style={styles.cardHeader}>
@@ -85,7 +138,7 @@ export default function PatientSearchScreen() {
           </Text>
         </View>
 
-        {/* View History button (v2.0) */}
+        {/* View History button */}
         <Button
           mode="outlined"
           onPress={() =>
@@ -135,7 +188,7 @@ export default function PatientSearchScreen() {
             <Text style={styles.emptyText}>
               {searchQuery
                 ? 'No patients match your search.'
-                : 'No patients enrolled yet.'}
+                : 'No patients have visited your department yet.'}
             </Text>
           }
           contentContainerStyle={styles.listContainer}

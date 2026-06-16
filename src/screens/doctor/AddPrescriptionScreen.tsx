@@ -218,19 +218,19 @@ export default function AddPrescriptionScreen({ route, navigation }: any) {
         </Card>
 
         {/* Diagnosis */}
-        <Text style={styles.sectionLabel}>Diagnosis *</Text>
+        <Text style={styles.sectionLabel}>Clinical Assesment*</Text>
         <TextInput
           mode="outlined"
           value={diagnosis}
           onChangeText={setDiagnosis}
-          placeholder="e.g. Acute pharyngitis"
+          placeholder="e.g. Blood Pressure"
           maxLength={200}
           style={styles.textInput}
         />
 
         {/* Medications */}
         <View style={styles.sectionHeader}>
-          <Text style={styles.sectionLabel}>Medications *</Text>
+          <Text style={styles.sectionLabel}>Medicine Prescribed *</Text>
           <Button
             mode="text"
             onPress={addMedication}
