@@ -13,6 +13,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import DoctorDashboard from '../screens/doctor/DoctorDashboard';
 import PatientSearchScreen from '../screens/doctor/PatientSearchScreen';
 import AddPrescriptionScreen from '../screens/doctor/AddPrescriptionScreen';
+import PatientHistoryScreen from '../screens/doctor/PatientHistoryScreen';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import AppHeader from '../components/AppHeader';
 import ProfilePanel from '../components/ProfilePanel';
@@ -33,6 +34,11 @@ export type DoctorStackParamList = {
     patientName: string;
     appointmentId?: string;
     tokenNumber?: string;
+  };
+  PatientHistory: {
+    patientId: string;
+    patientName: string;
+    patientDisplayId: string;
   };
 };
 
@@ -101,6 +107,15 @@ export default function DoctorNavigator() {
         options={{
           headerShown: true,
           title: 'Add Prescription',
+          headerBackTitle: 'Back',
+        }}
+      />
+      <Stack.Screen
+        name="PatientHistory"
+        component={PatientHistoryScreen}
+        options={{
+          headerShown: true,
+          title: 'Patient History',
           headerBackTitle: 'Back',
         }}
       />

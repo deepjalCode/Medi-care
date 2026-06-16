@@ -5,12 +5,13 @@ import {
   Card,
   Title,
   Paragraph,
+  Button,
   useTheme,
   Text,
   ActivityIndicator,
 } from 'react-native-paper';
 import { getAllUsersByRole, UserData } from '../../services/userService';
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
 export default function PatientSearchScreen() {
@@ -20,6 +21,7 @@ export default function PatientSearchScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const theme = useTheme();
+  const navigation = useNavigation<any>();
 
   const fetchPatients = async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true);
@@ -82,6 +84,24 @@ export default function PatientSearchScreen() {
             🪪 {item.patientId || item.id}
           </Text>
         </View>
+
+        {/* View History button (v2.0) */}
+        <Button
+          mode="outlined"
+          onPress={() =>
+            navigation.navigate('PatientHistory', {
+              patientId: item.id,
+              patientName: item.name,
+              patientDisplayId: item.patientId || item.id,
+            })
+          }
+          style={styles.historyBtn}
+          icon="history"
+          textColor="#5e35b1"
+          compact
+        >
+          View History
+        </Button>
       </Card.Content>
     </Card>
   );
@@ -152,6 +172,11 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start',
   },
   patientId: { fontWeight: 'bold', color: '#1b5e20', fontSize: 13 },
+  historyBtn: {
+    marginTop: 10,
+    borderColor: '#5e35b1',
+    alignSelf: 'flex-start',
+  },
   emptyText: {
     textAlign: 'center',
     marginTop: 40,

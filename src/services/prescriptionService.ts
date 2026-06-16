@@ -228,3 +228,34 @@ async function enrichPatientNames(prescriptions: PrescriptionData[]): Promise<vo
     console.error('PrescriptionService: enrichPatientNames failed', err);
   }
 }
+
+// ─── Fetch Patient Prescription History (Doctor Portal) ─────────────────────────
+
+/**
+ * Fetches a patient's complete prescription history, enriched with doctor names.
+ * Used by the Doctor portal to review a returning patient's past treatments.
+ *
+ * Access is controlled by the RLS policy "Doctors can read patient history if treated",
+ * which ensures a doctor can only access prescriptions for patients they have
+ * at least one appointment with.
+ */
+export const getPatientPrescriptionHistory = async (
+  patientId: string,
+): Promise<PrescriptionData[]> => {
+  try {
+    const { data, error } = await supabase
+      .from(TABLE)
+      .select('*')
+      .eq('patient_id', patientId)
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+
+    const prescriptions = (data ?? []).map(mapPrescription);
+    await enrichDoctorNames(prescriptions);
+    return prescriptions;
+  } catch (error) {
+    console.error('PrescriptionService: getPatientPrescriptionHistory failed', error);
+    return [];
+  }
+};

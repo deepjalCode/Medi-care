@@ -1,112 +1,79 @@
 /**
- * PrescriptionsScreen (v2.0)
+ * PatientHistoryScreen (v1.0)
  *
- * Patient-facing screen for viewing all prescriptions.
- * Displayed as a tab in PatientNavigator.
+ * Doctor-facing screen for viewing a returning patient's full
+ * prescription history. Pushed as a stack screen from PatientSearchScreen
+ * or DoctorDashboard.
  *
  * Features:
- * - List of prescription cards sorted by date (newest first)
- * - Each card shows doctor name, diagnosis, medications, notes
- * - Pull-to-refresh
- * - Realtime subscription for new prescriptions
- * - Download individual prescription as PDF (v2.0)
+ * - Patient info header (name + display ID)
+ * - Full prescription history from all doctors
+ * - Each card shows doctor name, diagnosis, medications, notes, date
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, StyleSheet, ScrollView, RefreshControl, Alert } from 'react-native';
+import { View, StyleSheet, ScrollView, RefreshControl } from 'react-native';
 import {
   Card,
   Title,
   Text,
-  Button,
   useTheme,
   ActivityIndicator,
   Divider,
 } from 'react-native-paper';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
-import { useSelector } from 'react-redux';
-import { RootState } from '../../store';
-import { supabase } from '../../services/supabaseSetup';
 import {
-  getPatientPrescriptions,
+  getPatientPrescriptionHistory,
   PrescriptionData,
   MedicationItem,
 } from '../../services/prescriptionService';
-import { generatePrescriptionPdf } from '../../services/pdfService';
+
+// ─── Types ─────────────────────────────────────────────────────────────────────
+
+interface RouteParams {
+  patientId: string;
+  patientName: string;
+  patientDisplayId: string;
+}
 
 // ─── Component ─────────────────────────────────────────────────────────────────
 
-export default function PrescriptionsScreen() {
+export default function PatientHistoryScreen({ route }: any) {
   const theme = useTheme();
-  const { userId } = useSelector((state: RootState) => state.auth);
+  const {
+    patientId,
+    patientName,
+    patientDisplayId,
+  } = (route.params ?? {}) as RouteParams;
 
   const [prescriptions, setPrescriptions] = useState<PrescriptionData[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [downloadingId, setDownloadingId] = useState<string | null>(null);
 
-  // ── Fetch prescriptions ───────────────────────────────────────────────────
+  // ── Fetch history ─────────────────────────────────────────────────────────
 
-  const fetchPrescriptions = useCallback(async () => {
-    if (!userId) return;
+  const fetchHistory = useCallback(async () => {
+    if (!patientId) return;
     try {
-      const data = await getPatientPrescriptions(userId);
+      const data = await getPatientPrescriptionHistory(patientId);
       setPrescriptions(data);
     } catch (err) {
-      console.error('PrescriptionsScreen: fetch failed', err);
+      console.error('PatientHistoryScreen: fetch failed', err);
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [userId]);
-
-  // ── Realtime subscription ─────────────────────────────────────────────────
+  }, [patientId]);
 
   useEffect(() => {
-    fetchPrescriptions();
-
-    const channel = supabase
-      .channel('patient-prescriptions')
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'prescriptions',
-          filter: `patient_id=eq.${userId}`,
-        },
-        () => {
-          // Re-fetch to get joined data (doctor name, etc.)
-          fetchPrescriptions();
-        },
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [fetchPrescriptions, userId]);
+    fetchHistory();
+  }, [fetchHistory]);
 
   // ── Pull-to-refresh ───────────────────────────────────────────────────────
 
   const onRefresh = () => {
     setRefreshing(true);
-    fetchPrescriptions();
-  };
-
-  // ── Download prescription as PDF ──────────────────────────────────────────
-
-  const handleDownloadPdf = async (rx: PrescriptionData) => {
-    if (!rx.id) return;
-    setDownloadingId(rx.id);
-    try {
-      await generatePrescriptionPdf(rx);
-    } catch (err) {
-      console.error('PrescriptionsScreen: PDF generation failed', err);
-      Alert.alert('Error', 'Could not generate PDF. Please try again.');
-    } finally {
-      setDownloadingId(null);
-    }
+    fetchHistory();
   };
 
   // ── Format date ───────────────────────────────────────────────────────────
@@ -134,9 +101,25 @@ export default function PrescriptionsScreen() {
         <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
       }
     >
+      {/* Patient Info Header */}
+      <Card style={styles.patientCard}>
+        <Card.Content style={styles.patientCardContent}>
+          <Icon
+            name="account-circle"
+            size={44}
+            color={theme.colors.primary}
+          />
+          <View style={styles.patientInfo}>
+            <Title style={styles.patientName}>{patientName}</Title>
+            <Text style={styles.patientIdText}>{patientDisplayId}</Text>
+          </View>
+        </Card.Content>
+      </Card>
+
+      {/* Prescription Count */}
       <View style={styles.headerInfo}>
         <Text style={styles.subtitle}>
-          {prescriptions.length} prescription(s)
+          {prescriptions.length} prescription(s) on record
         </Text>
       </View>
 
@@ -215,29 +198,15 @@ export default function PrescriptionsScreen() {
                       </View>
                     </>
                   ) : null}
-
-                  {/* Download PDF button (v2.0) */}
-                  <Button
-                    mode="outlined"
-                    onPress={() => handleDownloadPdf(rx)}
-                    style={styles.downloadBtn}
-                    icon="download"
-                    textColor="#7c4dff"
-                    compact
-                    loading={downloadingId === rx.id}
-                    disabled={downloadingId === rx.id}
-                  >
-                    Download PDF
-                  </Button>
                 </Card.Content>
               </Card>
             ))
           ) : (
             <View style={styles.emptyState}>
-              <Icon name="pill" size={48} color="#ccc" />
-              <Text style={styles.emptyText}>No prescriptions yet.</Text>
+              <Icon name="pill-off" size={48} color="#ccc" />
+              <Text style={styles.emptyText}>No prescription history.</Text>
               <Text style={styles.emptySubtext}>
-                Prescriptions from your doctor will appear here.
+                This patient has no prescriptions on record.
               </Text>
             </View>
           )}
@@ -254,9 +223,33 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: 16,
   },
+  patientCard: {
+    marginBottom: 16,
+    borderLeftWidth: 4,
+    borderLeftColor: '#03dac6',
+    elevation: 2,
+    borderRadius: 12,
+  },
+  patientCardContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  patientInfo: {
+    marginLeft: 12,
+    flex: 1,
+  },
+  patientName: {
+    fontSize: 20,
+    fontWeight: 'bold',
+  },
+  patientIdText: {
+    fontSize: 13,
+    color: '#666',
+    marginTop: 2,
+    fontFamily: 'monospace',
+  },
   headerInfo: {
     marginBottom: 16,
-    marginTop: 8,
   },
   subtitle: {
     fontSize: 16,
@@ -360,10 +353,5 @@ const styles = StyleSheet.create({
     color: '#888',
     fontStyle: 'italic',
     textAlign: 'center',
-  },
-  downloadBtn: {
-    marginTop: 12,
-    borderColor: '#7c4dff',
-    alignSelf: 'flex-start',
   },
 });

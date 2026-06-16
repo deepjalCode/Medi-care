@@ -4,6 +4,7 @@ import AdminDashboard from '../screens/admin/AdminDashboard';
 import RegisterPatientScreen from '../screens/admin/RegisterPatientScreen';
 import DoctorRegistrationScreen from '../screens/admin/DoctorRegistrationScreen';
 import SearchPatientScreen from '../screens/admin/SearchPatientScreen';
+import AdminReportScreen from '../screens/admin/AdminReportScreen';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import AppHeader from '../components/AppHeader';
 import ProfilePanel from '../components/ProfilePanel';
@@ -13,6 +14,7 @@ export type AdminTabParamList = {
   RegisterUser: undefined;
   RegisterDoctor: undefined;
   SearchPatient: undefined;
+  Reports: undefined;
 };
 
 const Tab = createBottomTabNavigator<AdminTabParamList>();
@@ -22,6 +24,7 @@ const TITLES: Record<string, string> = {
   RegisterUser: 'Register Patient',
   RegisterDoctor: 'Add Doctor',
   SearchPatient: 'Search Patient',
+  Reports: 'Reports',
 };
 
 export default function AdminNavigator() {
@@ -37,6 +40,7 @@ export default function AdminNavigator() {
             else if (route.name === 'RegisterUser') iconName = 'account-plus';
             else if (route.name === 'RegisterDoctor') iconName = 'doctor';
             else if (route.name === 'SearchPatient') iconName = 'account-search';
+            else if (route.name === 'Reports') iconName = 'chart-bar';
             return <Icon name={iconName} size={size} color={color} />;
           },
           header: () => (
@@ -51,6 +55,7 @@ export default function AdminNavigator() {
         <Tab.Screen name="RegisterUser" component={RegisterPatientScreen} options={{ title: 'Register Patient' }} />
         <Tab.Screen name="RegisterDoctor" component={DoctorRegistrationScreen} options={{ title: 'Add Doctor' }} />
         <Tab.Screen name="SearchPatient" component={SearchPatientScreen} options={{ title: 'Search Patient' }} />
+        <Tab.Screen name="Reports" component={AdminReportScreen} options={{ title: 'Reports' }} />
       </Tab.Navigator>
 
       <ProfilePanel
